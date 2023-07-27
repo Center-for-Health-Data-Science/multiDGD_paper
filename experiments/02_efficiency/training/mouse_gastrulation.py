@@ -13,7 +13,7 @@ random_seed = args.random_seed
 ###
 # load data
 ###
-"""
+#"""
 # test different feature selection thresholds
 import anndata as ad
 import numpy as np
@@ -25,23 +25,11 @@ ids_atac = np.where(atac.obs['sample'].index.isin(ids_shared))[0]
 gex = gex[ids_gex]
 atac = atac[ids_atac]
 threshold = 0.00
-if threshold > 0.000:
-    percent_threshold = int(threshold * len(ids_shared))
-    gene_nonzero_id, gene_nonzero_count = np.unique(gex.X.copy().tocsr().nonzero()[1], return_counts=True)
-    selected_features = gene_nonzero_id[np.where(gene_nonzero_count >= percent_threshold)[0]]
-    modality_switch = len(selected_features)
-    print('selected '+str(len(selected_features))+' gex features')
-    percent_threshold = int(threshold * len(ids_shared))
-    atac_nonzero_id, atac_nonzero_count = np.unique(atac.X.copy().tocsr().nonzero()[1], return_counts=True)
-    selected_features_atac = atac_nonzero_id[np.where(atac_nonzero_count >= percent_threshold)[0]]
-    print('selected '+str(len(selected_features_atac))+' atac features')
-    mudata = md.MuData({'rna': gex[:,selected_features], 'atac': atac[:,selected_features_atac]})
-else:
-    mudata = md.MuData({'rna': gex, 'atac': atac})
-"""
+mudata = md.MuData({'rna': gex, 'atac': atac})
+#"""
 
 #mudata = md.read('data/mouse_gastrulation/extras/mudata_05rna1atac_percentCells.h5mu', backed=False)
-mudata = md.read('data/mouse_gastrulation/mudata.h5mu', backed=False)
+#mudata = md.read('data/mouse_gastrulation/mudata.h5mu', backed=False)
 mudata.obs['stage'] = mudata['atac'].obs['stage']#.values
 mudata.obs['celltype'] = mudata['rna'].obs['celltype']#.values
 

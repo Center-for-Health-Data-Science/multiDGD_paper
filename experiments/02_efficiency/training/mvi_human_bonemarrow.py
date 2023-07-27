@@ -9,12 +9,19 @@ import scvi
 import anndata as ad
 import pandas as pd
 
-fraction_options = [0.01, 0.1, 0.25, 0.5, 0.75]
-fraction = 0.01
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--random_seed', type=int, default=0)
+parser.add_argument('--fraction', type=float)
+args = parser.parse_args()
+random_seed = args.random_seed
+fraction = args.fraction
+#fraction_options = [0.01, 0.1, 0.25, 0.5, 0.75]
+#fraction = 0.01
 
 #random_seed = 0
 #random_seed = 37
-random_seed = 8790
+#random_seed = 8790
 scvi.settings.seed = random_seed
 
 data_name = 'human_bonemarrow'

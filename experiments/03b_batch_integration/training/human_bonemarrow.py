@@ -4,11 +4,20 @@ import pandas as pd
 
 from omicsdgd import DGD
 
+# create argument parser for the batch left out
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--batch_left_out', type=int, default=0)
+parser.add_argument('--random_seed', type=int, default=0)
+args = parser.parse_args()
+batch_left_out = args.batch_left_out
+random_seed = args.random_seed
+
 ###
 # load data
 ###
 data_name = 'human_bonemarrow'
-batch_left_out = 3
+#batch_left_out = 3
 
 adata = ad.read_h5ad('data/'+data_name+'/GSE194122_openproblems_neurips2021_multiome_BMMC_processed.h5ad')
 batches = adata.obs['Site'].unique()
@@ -35,7 +44,7 @@ hyperparameters = {
 }
 #random_seed = 8790
 #random_seed = 37
-random_seed = 0
+#random_seed = 0
 
 model = DGD(data=adata,
             parameter_dictionary=hyperparameters,

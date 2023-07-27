@@ -4,6 +4,13 @@ import pandas as pd
 
 from omicsdgd import DGD
 
+# define seed in command line
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--random_seed', type=int, default=0)
+args = parser.parse_args()
+random_seed = args.random_seed
+
 ###
 # load data
 ###
@@ -31,7 +38,7 @@ hyperparameters = {
 }
 #random_seed = 8790
 #random_seed = 37
-random_seed = 0
+#random_seed = 0
 
 model = DGD(data=adata, 
             parameter_dictionary=hyperparameters,
