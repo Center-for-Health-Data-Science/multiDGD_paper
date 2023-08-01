@@ -24,3 +24,7 @@ Refers to `2.5.2 Integrating unseen batches without architectural surgery`.
 ### 04_gene2peak
 
 Refers to `2.6 Gene-to-peak association with in silico perturbation`.
+
+## !Note!
+
+***This is still a work in progress, and we hope you have patience with us. We are cleaning and refactoring our code from more than half a year of work for you, so that you can run the experiments from our manuscript.***

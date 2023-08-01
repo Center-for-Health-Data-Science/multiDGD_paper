@@ -10,6 +10,4 @@ If you would like to use multiDGD or scDGD, we recommend the package repositorie
 
 ## !Note!
 
-```
-This repository is still a work in progress, as we are cleaning up the project to provide you with a well-structured pipeline for the experiments of our manuscript.
-```
+***This repository is still a work in progress, as we are cleaning up the project to provide you with a well-structured pipeline for the experiments of our manuscript.***
