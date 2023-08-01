@@ -5,9 +5,9 @@ Our experiments folder is structured according to the order in which they appear
 ### 01_performance
 
 This folder refers to Sections `2.2 Improved performance on data reconstruction and clustering` and `2.3 Probabilistic modelling of batch effects`. It contains most training and analysis in this work.
-Pretrained models will be available in the [multiDGD](https://github.com/Center-for-Health-Data-Science/multiDGD) repository.
+Pretrained models are available on Figshare under [https://doi.org/10.6084/m9.figshare.23796198.v1](https://doi.org/10.6084/m9.figshare.23796198.v1).
 
-If you would like to run anything, please stick to the order of the folders and run `bash_run.sh` before `bash_analysis.sh`.
+If you would like to try to reproduce anything, please stick to the order of the folders and run `bash_run.sh` before `bash_analysis.sh`.
 
 ### 02_efficiency
 
