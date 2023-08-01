@@ -17,6 +17,4 @@ Here are scripts used to make the figures in the manuscript.
 
 ## !Note!
 
-```
-This is still a work in progress, and we hope you have patience with us. We are cleaning and refactoring our code from more than half a year of work for you, so that you can run the experiments from our manuscript.
-```
+***This is still a work in progress, and we hope you have patience with us. We are cleaning and refactoring our code from more than half a year of work for you, so that you can run the experiments from our manuscript.***
