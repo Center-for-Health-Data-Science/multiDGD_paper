@@ -7,6 +7,7 @@ load a trained multiVI (currently scVI) model and integrate a new 'batch' of sam
 import scvi
 import anndata as ad
 import pandas as pd
+import numpy as np
 
 # import scarches as sca
 
@@ -33,6 +34,7 @@ train_indices = [
     for x in train_indices_all
     if adata.obs["Site"].values[x] != batches[batch_left_out]
 ]
+test_indices = list(np.where(adata.obs["train_val_test"] == "test")[0])
 adata = adata[train_indices]
 adata.var_names_make_unique()
 adata.obs["modality"] = "paired"

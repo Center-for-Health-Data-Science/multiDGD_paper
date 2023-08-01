@@ -73,13 +73,17 @@ import umap.umap_ as umap
 # first, get the training representations
 train_rep = model.representation.z.detach().numpy()
 # fit a umap
-umap_train = umap.UMAP(n_neighbors=15, min_dist=0.1, metric="euclidean").fit(train_rep)
+n_neighbors = 50
+min_dist = 0.75
+column_names = ['UMAP1', 'UMAP2']
+reducer = umap.UMAP(n_neighbors=n_neighbors, n_components=2, min_dist=min_dist)
+projected = reducer.fit_transform(train_rep)
 # map the test representations
-umap_test = umap_train.transform(rep)
+projected_test = reducer.transform(rep)
 # make a dataframe
-umap_df = pd.DataFrame(umap_train, columns=["UMAP1", "UMAP2"])
+umap_df = pd.DataFrame(projected, columns=column_names)
 umap_df["data_set"] = "train"
-umap_df_test = pd.DataFrame(umap_test, columns=["UMAP1", "UMAP2"])
+umap_df_test = pd.DataFrame(projected_test, columns=column_names)
 umap_df_test["data_set"] = modality_labels
 # replace every 'expression' with 'rna' and 'accessibility' with 'atac'
 umap_df_test["data_set"] = umap_df_test["data_set"].replace("paired", "test (paired)")
