@@ -20,5 +20,4 @@
 # for GPU usage:
 hostname
 echo $CUDA_VISIBLE_DEVICES
-python3 ./03_modality_prediction_and_integration/unpairing_data.py
-python3 ./03_modality_prediction_and_integration/human_bonemarrow_test.py
+python3 ./testing/human_bonemarrow_test.py

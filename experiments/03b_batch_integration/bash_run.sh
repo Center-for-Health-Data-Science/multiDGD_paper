@@ -34,4 +34,7 @@ python3 ./training/mvi_human_bonemarrow.py --batch_left_out 1 --random_seed 0
 python3 ./training/mvi_human_bonemarrow.py --batch_left_out 2 --random_seed 0
 python3 ./training/mvi_human_bonemarrow.py --batch_left_out 3 --random_seed 0
 # mvi+scArches
-python3 ./training/scarches_human_bonemarrow.py
+python3 ./training/scarches_human_bonemarrow_trainset.py --batch_left_out 0 --random_seed 0
+python3 ./training/scarches_human_bonemarrow_trainset.py --batch_left_out 1 --random_seed 0
+python3 ./training/scarches_human_bonemarrow_trainset.py --batch_left_out 2 --random_seed 0
+python3 ./training/scarches_human_bonemarrow_trainset.py --batch_left_out 3 --random_seed 0

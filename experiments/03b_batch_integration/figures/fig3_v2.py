@@ -381,7 +381,7 @@ sns.boxplot(
     dodge=False,
 )
 sns.stripplot(x="model",y=metric,color='black',data=df_batch_effect[df_batch_effect["batch"] != "none"],ax=ax_list[-1], size=strip_size)
-reconstruction_temp = pd.read_csv("results/analysis/performance_evaluation/reconstruction/human_bonemarrow_2.csv")
+reconstruction_temp = pd.read_csv("results/analysis/performance_evaluation/reconstruction/human_bonemarrow.csv")
 ax_list[-1].legend(
     bbox_to_anchor=(1.02 + legend_x_dist, 1.0 + legend_y_dist),
     loc="upper left",
@@ -577,114 +577,6 @@ else:
 ###
 # plots
 ###
-
-"""
-site = "site1"
-ax_list.append(plt.subplot(gs[2, 0:2]))
-ax_list[-1].text(
-    grid_letter_positions[0] -0.1,
-    1.0 + grid_letter_positions[1],
-    "D",
-    transform=ax_list[-1].transAxes + trans,
-    fontsize=grid_letter_fontsize,
-    va="bottom",
-    fontfamily=grid_letter_fontfamily,
-    fontweight=grid_letter_fontweight,
-)
-sns.scatterplot(
-    data=umap_data[umap_data["model"] == site].sort_values(by="batch"),
-    x=column_names[0],
-    y=column_names[1],
-    hue="batch",
-    palette=palette_3colrs,
-    ax=ax_list[-1],
-    s=point_size,
-)
-ax_list[-1].set_title(
-    site + " (1-ASW = " + str(round(df_batch_effect[df_batch_effect["batch"] == site]["1 - ASW"].item(), 4)) + ")"
-)
-#ax_list[-1].legend(
-#    bbox_to_anchor=(1.02 + legend_x_dist, 1.0 + legend_y_dist),
-#    loc="upper left",
-#    frameon=False,
-#    handletextpad=handletextpad,
-#    ncol=1,
-#).set_visible(False)
-ax_list[-1].legend(
-    bbox_to_anchor=(1.0 , -0.3),
-    loc="upper left",
-    frameon=False,
-    handletextpad=handletextpad,
-    ncol=6,
-)#.set_visible(False)
-
-site = "site2"
-ax_list.append(plt.subplot(gs[2, 3:5]))
-sns.scatterplot(
-    data=umap_data[umap_data["model"] == site].sort_values(by="batch"),
-    x=column_names[0],
-    y=column_names[1],
-    hue="batch",
-    palette=palette_3colrs,
-    ax=ax_list[-1],
-    s=point_size,
-)
-ax_list[-1].set_title(
-    site + " (1-ASW = " + str(round(df_batch_effect[df_batch_effect["batch"] == site]["1 - ASW"].item(), 4)) + ")"
-)
-ax_list[-1].legend(
-    bbox_to_anchor=(1.02 + legend_x_dist, 1.0 + legend_y_dist),
-    loc="upper left",
-    frameon=False,
-    handletextpad=handletextpad,
-    ncol=1,
-).set_visible(False)
-
-site = "site3"
-ax_list.append(plt.subplot(gs[2, 6:8]))
-sns.scatterplot(
-    data=umap_data[umap_data["model"] == site].sort_values(by="batch"),
-    x=column_names[0],
-    y=column_names[1],
-    hue="batch",
-    palette=palette_3colrs,
-    ax=ax_list[-1],
-    s=point_size,
-)
-ax_list[-1].set_title(
-    site + " (1-ASW = " + str(round(df_batch_effect[df_batch_effect["batch"] == site]["1 - ASW"].item(), 4)) + ")"
-)
-ax_list[-1].legend(
-    bbox_to_anchor=(1.02 + legend_x_dist, 1.0 + legend_y_dist),
-    loc="upper left",
-    frameon=False,
-    handletextpad=handletextpad,
-    ncol=1,
-).set_visible(False)
-
-site = "site4"
-ax_list.append(plt.subplot(gs[2, 9:11]))
-sns.scatterplot(
-    data=umap_data[umap_data["model"] == site].sort_values(by="batch"),
-    x=column_names[0],
-    y=column_names[1],
-    hue="batch",
-    palette=palette_3colrs,
-    ax=ax_list[-1],
-    s=point_size,
-)
-ax_list[-1].set_title(
-    site + " (1-ASW = " + str(round(df_batch_effect[df_batch_effect["batch"] == site]["1 - ASW"].item(), 4)) + ")"
-)
-ax_list[-1].legend(
-    bbox_to_anchor=(-4. , -0.4),
-    loc="upper left",
-    frameon=False,
-    handletextpad=handletextpad,
-    ncol=6,
-).set_visible(False)
-"""
-
 site = "site4"
 ax_list.append(plt.subplot(gs[4:, 0:5]))
 ax_list[-1].text(
