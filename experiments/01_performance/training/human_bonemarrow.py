@@ -42,7 +42,7 @@ model = DGD(
     meta_label="cell_type",
     correction="Site",
     save_dir="./results/trained_models/" + data_name + "/",
-    model_name=data_name + "_l20_h2-3_rs" + str(random_seed) + "_sigmoid",
+    model_name=data_name + "_l20_h2-3_rs" + str(random_seed),
     random_seed=random_seed,
 )
 
