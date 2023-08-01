@@ -9,7 +9,10 @@ from sklearn.metrics import adjusted_rand_score
 import scipy
 
 from omicsdgd import DGD
-from omicsdgd.functions._data_manipulation import load_data_from_name
+from omicsdgd.functions._data_manipulation import (
+    load_testdata_as_anndata,
+    load_data_from_name,
+)
 from omicsdgd.functions._analysis import make_palette_from_meta
 
 # import the numpy representations derived from cobolt
@@ -54,7 +57,7 @@ aris_out = []
 for i, seed in enumerate(random_seeds):
     print("seed: ", seed)
     if not os.path.exists(
-        "results/analysis/performance_evaluation/cobolt_"
+        "results/analysis/performance_evaluation/scmm_"
         + data_name
         + "_rs"
         + str(random_seeds[i])
@@ -96,7 +99,11 @@ for i, seed in enumerate(random_seeds):
             cell_labels = trainset.obs["atac_celltype"].values
 
         # load rep
-        rep = np.load(save_dir + "cobolt_latent_rs" + str(random_seeds[i]) + ".npy")
+        # rep = np.load(save_dir + 'scmm_lat_train_mean_rs'+str(random_seeds[i])+'.npy')
+        rep = pd.read_csv(
+            save_dir + "scmm_lat_train_mean_rs" + str(random_seeds[i]) + ".csv",
+            index_col=0,
+        ).values
         print("   rep shape: ", rep.shape)
 
         # make umap
@@ -128,7 +135,7 @@ for i, seed in enumerate(random_seeds):
         plot_data["ARI"] = radj
         aris_out.append(radj)
         plot_data.to_csv(
-            "results/analysis/performance_evaluation/cobolt_"
+            "results/analysis/performance_evaluation/scmm_"
             + data_name
             + "_rs"
             + str(random_seeds[i])
@@ -137,7 +144,7 @@ for i, seed in enumerate(random_seeds):
         )
     else:
         plot_data = pd.read_csv(
-            "results/analysis/performance_evaluation/cobolt_"
+            "results/analysis/performance_evaluation/scmm_"
             + data_name
             + "_rs"
             + str(random_seeds[i])
@@ -175,16 +182,16 @@ if len(aris_out) > 0:
     # save aris as data frame with columns 'data', 'model', 'random seed', 'ARI'
     aris_df = pd.DataFrame(columns=["data", "model", "random seed", "ARI"])
     aris_df["data"] = ["brain (H)"] * len(random_seeds)
-    aris_df["model"] = ["cobolt"] * len(random_seeds)
+    aris_df["model"] = ["scMM"] * len(random_seeds)
     aris_df["random seed"] = random_seeds
     aris_df["ARI"] = aris_out
     aris_df.to_csv(
-        "results/analysis/performance_evaluation/cobolt_" + data_name + "_aris.csv",
+        "results/analysis/performance_evaluation/scmm_" + data_name + "_aris.csv",
         index=False,
     )
 
 plt.savefig(
-    "results/analysis/plots/performance_evaluation/fig_supp_cobolt_latent.png",
+    "results/analysis/plots/performance_evaluation/fig_supp_scmm_latent.png",
     dpi=300,
     bbox_inches="tight",
 )

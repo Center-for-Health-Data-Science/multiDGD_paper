@@ -20,4 +20,11 @@
 # for GPU usage:
 hostname
 echo $CUDA_VISIBLE_DEVICES
-python3 ./analysis/reconstruction_performance_test.py
+# first computing reconstruction performances
+python3 ./analysis/reconstruction_performance_test.py --data_index 0
+python3 ./analysis/reconstruction_performance_test.py --data_index 1
+python3 ./analysis/reconstruction_performance_test.py --data_index 2
+python3 ./analysis/reconstruction_performance_test_scmm.py
+python3 ./analysis/scmm_brain.py
+python3 ./analysis/cobolt_clustering.py
+python3 ./analysis/clustering_and_batch_effect.py
