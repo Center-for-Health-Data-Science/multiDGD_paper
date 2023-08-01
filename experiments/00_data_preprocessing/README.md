@@ -1,0 +1,3 @@
+## 00_data_preprocessing
+
+The final data sets used for training models are available on Figshare under [https://doi.org/10.6084/m9.figshare.23796198.v1](https://doi.org/10.6084/m9.figshare.23796198.v1). You can just download these into a `./data/` subdirectory of the project, unzip them and go ahead with experiments. These data sets were generated with the here included python scripts and you can download the raw data using the `download_data.sh` bash script.
