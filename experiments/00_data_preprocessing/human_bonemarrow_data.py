@@ -30,6 +30,7 @@ train_val_test_split["is_train"].values[dataset_ids[:n_testsamples]] = "validati
 train_val_test_split["is_train"].values[
     dataset_ids[n_testsamples : (2 * n_testsamples)]
 ] = "test"
+adata.obs["train_val_test"] = train_val_test_split["is_train"].values
 
 ###
 # prep obs for data
