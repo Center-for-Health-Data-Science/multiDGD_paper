@@ -14,7 +14,7 @@ import pandas as pd
 ###
 print("   loading data")
 adata = ad.read_h5ad(
-    "data/raw/GSE194122_openproblems_neurips2021_multiome_BMMC_processed.h5ad"
+    "../../data/raw/GSE194122_openproblems_neurips2021_multiome_BMMC_processed.h5ad"
 )
 
 ###
@@ -42,5 +42,5 @@ adata.X = adata.layers["counts"]
 ###
 # save data
 ###
-adata.write("data/human_bonemarrow.h5ad")
+adata.write_h5ad("../../data/human_bonemarrow.h5ad")
 print("   saved data")

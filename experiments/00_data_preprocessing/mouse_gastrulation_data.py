@@ -14,8 +14,8 @@ import pandas as pd
 # load data
 ###
 print("   loading data")
-gex = ad.read_h5ad("data/raw/mouse_gastrulation_anndata.h5ad")
-atac = ad.read_h5ad("data/raw/mouse_gastrulation_PeakMatrix_anndata.h5ad")
+gex = ad.read_h5ad("../../data/raw/mouse_gastrulation_anndata.h5ad")
+atac = ad.read_h5ad("../../data/raw/mouse_gastrulation_PeakMatrix_anndata.h5ad")
 
 ###
 # pair the data
@@ -92,5 +92,5 @@ mudata.obs["covariate_stage"] = mudata.obs["stage"].values
 ###
 # save data
 ###
-mudata.write("data/mouse_gastrulation.h5mu")
+mudata.write("../../data/mouse_gastrulation.h5mu")
 print("   saved data")

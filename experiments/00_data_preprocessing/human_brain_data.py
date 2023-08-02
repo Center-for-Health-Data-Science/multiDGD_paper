@@ -71,8 +71,8 @@ def get_matrix_from_multiple_h5s(filenames):
 
 # meta data taken from https://github.com/GreenleafLab/brainchromatin/blob/main/links.txt
 print("    collecting data and meta data")
-cell_meta_data = pd.read_csv("data/raw/brain_multiome_cell_metadata.txt", sep="\t")
-cluster_names = pd.read_csv("data/raw/brain_multiome_cluster_names.txt", sep="\t")
+cell_meta_data = pd.read_csv("../../data/raw/brain_multiome_cell_metadata.txt", sep="\t")
+cluster_names = pd.read_csv("../../data/raw/brain_multiome_cluster_names.txt", sep="\t")
 cell_meta_data["rna_celltype"] = [
     cluster_names[cluster_names["Assay"] == "Multiome RNA"]["Cluster.Name"].values[
         np.where(
@@ -95,7 +95,7 @@ cell_meta_data["atac_celltype"] = [
 ]
 
 filtered_feature_bc_matrix = get_matrix_from_multiple_h5s(
-    ["data/raw/brain_filtered_feature_bc_matrix.h5"]
+    ["../../data/raw/brain_filtered_feature_bc_matrix.h5"]
 )
 
 ###
@@ -188,10 +188,10 @@ train_val_test_split["is_train"].values[dataset_ids[:n_testsamples]] = "validati
 train_val_test_split["is_train"].values[
     dataset_ids[n_testsamples : (2 * n_testsamples)]
 ] = "test"
-mudata.obs["is_train"] = train_val_test_split["is_train"].values
+mudata.obs["train_val_test"] = train_val_test_split["is_train"].values
 
 ###
 # save data
 ###
-mudata.write("data/human_brain.h5mu")
+mudata.write("../../data/human_brain.h5mu")
 print("   saved data")
