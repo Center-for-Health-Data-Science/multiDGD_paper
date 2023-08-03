@@ -162,6 +162,7 @@ cython_debug/
 # data and models
 data/raw/
 wandb/
+results/
 *.pt
 *.json
 *.h5ad

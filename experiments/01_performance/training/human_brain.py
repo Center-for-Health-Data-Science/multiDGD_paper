@@ -27,7 +27,6 @@ print("training multiDGD on human brain data with random seed ", random_seed)
 ###
 data_name = "human_brain"
 mudata = md.read("../../data/human_brain.h5mu", backed=False)
-print(mudata)
 train_val_split = [
     list(np.where(mudata.obs["train_val_test"] == "train")[0]),
     list(np.where(mudata.obs["train_val_test"] == "validation")[0]),
@@ -49,7 +48,7 @@ model = DGD(
     train_validation_split=train_val_split,
     meta_label="celltype",
     save_dir="../results/trained_models/" + data_name + "/",
-    model_name="human_brain_l20_h2-3_a2_rs" + str(random_seed),
+    model_name="human_brain_l20_h2-2_a2_rs" + str(random_seed),
     random_seed=random_seed,
 )
 

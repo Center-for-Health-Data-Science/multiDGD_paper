@@ -26,6 +26,7 @@ if not os.path.exists(save_dir):
 
 data_name = "human_bonemarrow"
 adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+adata.X = adata.layers["counts"] # I seem to have to do it again
 
 train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
 adata = adata[train_indices]

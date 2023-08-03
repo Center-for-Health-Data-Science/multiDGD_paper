@@ -22,6 +22,7 @@ print("training multiDGD on human bonemarrow data with random seed ", random_see
 ###
 data_name = "human_bonemarrow"
 adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+adata.X = adata.layers["counts"] # I seem to have to do it again
 
 # train-validation-test split for reproducibility
 # best provided as list [[train_indices], [validation_indices]]
@@ -64,12 +65,13 @@ print("   model saved")
 ###
 # predict for test set
 ###
+original_name = model._model_name
 # change the model name (because we did inference once for 10 epochs and once for 50)
-model._model_name = model._model_name + "_test10e"
+model._model_name = original_name + "_test10e"
 testset = adata[adata.obs["train_val_test"] == "test"].copy()
 model.predict_new(testset)
 print("   test set inferred")
 
-model._model_name = model._model_name + "_test50e"
+model._model_name = original_name + "_test50e"
 model.predict_new(testset, n_epochs=50)
 print("   test set inferred (long)")
