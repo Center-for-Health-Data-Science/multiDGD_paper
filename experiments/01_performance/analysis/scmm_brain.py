@@ -7,16 +7,11 @@ import anndata as ad
 from sklearn import preprocessing
 from sklearn.metrics import adjusted_rand_score
 import scipy
-
-from omicsdgd import DGD
-from omicsdgd.functions._data_manipulation import (
-    load_testdata_as_anndata,
-    load_data_from_name,
-)
 from omicsdgd.functions._analysis import make_palette_from_meta
 
 # import the numpy representations derived from cobolt
-save_dir = "./results/analysis/performance_evaluation/"
+save_dir = "../results/other_models/scMM/"
+data_dir = "../../data/"
 random_seeds = [0, 37, 8790]
 
 ########################
@@ -57,19 +52,18 @@ aris_out = []
 for i, seed in enumerate(random_seeds):
     print("seed: ", seed)
     if not os.path.exists(
-        "results/analysis/performance_evaluation/scmm_"
+        save_dir+"scmm_"
         + data_name
         + "_rs"
         + str(random_seeds[i])
         + "_umap.csv"
     ):
         if trainset is None:
-            is_train_df = pd.read_csv("data/" + data_name + "/train_val_test_split.csv")
-            data = load_data_from_name(data_name)
-            # print(data)
+            import mudata as md
+            data = md.read(data_dir+"human_brain.h5mu", backed=False)
             modality_switch = data["rna"].X.shape[1]
             adata = ad.AnnData(scipy.sparse.hstack((data["rna"].X, data["atac"].X)))
-            adata.obs = data["rna"].obs
+            adata.obs = data.obs
             adata.var = pd.DataFrame(
                 index=data["rna"].var_names.tolist() + data["atac"].var_names.tolist(),
                 data={
@@ -81,25 +75,17 @@ for i, seed in enumerate(random_seeds):
             )
             data = None
             data = adata
-            train_indices = is_train_df[is_train_df["is_train"] == "train"][
-                "num_idx"
-            ].values
-            test_indices = is_train_df[is_train_df["is_train"] == "iid_holdout"][
-                "num_idx"
-            ].values
+            train_indices = list(np.where(data.obs["train_val_test"] == "train")[0])
+            test_indices = list(np.where(data.obs["train_val_test"] == "test")[0])
             if not isinstance(
                 data.X, scipy.sparse.csc_matrix
-            ):  # type(data.X) is not scipy.sparse._csc.csc_matrix:
+            ):
                 data.X = data.X.tocsr()
             trainset = data.copy()[train_indices]
-            # cluster_class_neworder, class_palette = make_palette_from_meta(data_name)
-            # is_train_df = pd.read_csv('data/'+data_name+'/train_val_test_split.csv')
-            # trainset, testset, modality_switch, library = load_testdata_as_anndata(data_name)
-            trainset.obs["cell_type"] = trainset.obs["atac_celltype"].values
-            cell_labels = trainset.obs["atac_celltype"].values
+            #trainset.obs["cell_type"] = trainset.obs["atac_celltype"].values
+            cell_labels = trainset.obs["celltype"].values
 
         # load rep
-        # rep = np.load(save_dir + 'scmm_lat_train_mean_rs'+str(random_seeds[i])+'.npy')
         rep = pd.read_csv(
             save_dir + "scmm_lat_train_mean_rs" + str(random_seeds[i]) + ".csv",
             index_col=0,
@@ -127,15 +113,15 @@ for i, seed in enumerate(random_seeds):
         n_clusters = len(np.unique(trainset.obs["clusters"].values))
         print("   number of leiden clusters: ", n_clusters)
         le = preprocessing.LabelEncoder()
-        le.fit(trainset.obs["cell_type"].values)
-        true_labels = le.transform(trainset.obs["cell_type"].values)
+        le.fit(trainset.obs["celltype"].values)
+        true_labels = le.transform(trainset.obs["celltype"].values)
         cluster_labels = trainset.obs["clusters"].values.astype(int)
         radj = adjusted_rand_score(true_labels, np.asarray(cluster_labels))
         print("   Adjusted RAND index: ", radj)
         plot_data["ARI"] = radj
         aris_out.append(radj)
         plot_data.to_csv(
-            "results/analysis/performance_evaluation/scmm_"
+            "../results/analysis/performance_evaluation/scmm_"
             + data_name
             + "_rs"
             + str(random_seeds[i])
@@ -144,7 +130,7 @@ for i, seed in enumerate(random_seeds):
         )
     else:
         plot_data = pd.read_csv(
-            "results/analysis/performance_evaluation/scmm_"
+            "../results/analysis/performance_evaluation/scmm_"
             + data_name
             + "_rs"
             + str(random_seeds[i])
@@ -186,12 +172,15 @@ if len(aris_out) > 0:
     aris_df["random seed"] = random_seeds
     aris_df["ARI"] = aris_out
     aris_df.to_csv(
-        "results/analysis/performance_evaluation/scmm_" + data_name + "_aris.csv",
+        "../results/analysis/performance_evaluation/scmm_" + data_name + "_aris.csv",
         index=False,
     )
 
+# make sure directory exists
+if not os.path.exists("../results/analysis/plots/performance_evaluation/"):
+    os.makedirs("../results/analysis/plots/performance_evaluation/")
 plt.savefig(
-    "results/analysis/plots/performance_evaluation/fig_supp_scmm_latent.png",
+    "../results/analysis/plots/performance_evaluation/fig_supp_scmm_latent.png",
     dpi=300,
     bbox_inches="tight",
 )
