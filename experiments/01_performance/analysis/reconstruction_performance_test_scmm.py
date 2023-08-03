@@ -4,6 +4,7 @@ import pandas as pd
 import torch
 from scipy.io import mmread
 
+data_dir = "../../data/"
 
 def compute_error_per_sample(target, output, reduction_type="ms"):
     """compute sample-wise error
@@ -83,32 +84,32 @@ def binarize(x, threshold=0.5):
 
 
 if not os.path.exists(
-    "results/analysis/performance_evaluation/reconstruction/brain_test_counts_gex.npy"
+    "../results/analysis/performance_evaluation/reconstruction/brain_test_counts_gex.npy"
 ):
     # load brain data
     import mudata as md
-
-    data = md.read("data/human_brain/mudata.h5mu", backed=False)
-    # load train-val-test split
-    is_train_df = pd.read_csv("data/human_brain/train_val_test_split.csv")
+    data = md.read(data_dir+"human_brain.h5mu", backed=False)
+    test_indices = test_indices = list(np.where(data.obs["train_val_test"] == "test")[0])
     # extract test set
-    test_data = data[is_train_df["is_train"] == "iid_holdout"]
+    test_data = data[test_indices, :]
     # now save the test set by modality
     np.save(
-        "results/analysis/performance_evaluation/reconstruction/brain_test_counts_gex.npy",
+        "../results/analysis/performance_evaluation/reconstruction/brain_test_counts_gex.npy",
         test_data["rna"].X.toarray(),
     )
     np.save(
-        "results/analysis/performance_evaluation/reconstruction/brain_test_counts_atac.npy",
+        "../results/analysis/performance_evaluation/reconstruction/brain_test_counts_atac.npy",
         test_data["atac"].X.toarray(),
     )
+    test_gex = test_data["rna"].X.toarray()
+    test_atac = test_data["atac"].X.toarray()
 else:
     print("data sets already generated")
     test_gex = np.load(
-        "results/analysis/performance_evaluation/reconstruction/brain_test_counts_gex.npy"
+        "../results/analysis/performance_evaluation/reconstruction/brain_test_counts_gex.npy"
     )
     test_atac = np.load(
-        "results/analysis/performance_evaluation/reconstruction/brain_test_counts_atac.npy"
+        "../results/analysis/performance_evaluation/reconstruction/brain_test_counts_atac.npy"
     )
 
 n_samples = test_gex.shape[0]
@@ -123,7 +124,7 @@ for count, seed in enumerate(random_seeds):
 
     recon_gex = np.asarray(
         mmread(
-            "results/analysis/performance_evaluation/reconstruction/scmm_counts_gex_rs"
+            "../results/other_models/scMM/scmm_counts_gex_rs"
             + str(seed)
             + ".mtx"
         ).todense()
@@ -135,7 +136,7 @@ for count, seed in enumerate(random_seeds):
     plt.xlabel("original")
     plt.ylabel("reconstructed")
     plt.savefig(
-        "results/analysis/plots/performance_evaluation/scmm_counts_gex_rs"
+        "../results/analysis/plots/performance_evaluation/scmm_counts_gex_rs"
         + str(seed)
         + ".png"
     )
@@ -154,7 +155,7 @@ for count, seed in enumerate(random_seeds):
 
     recon_atac = np.asarray(
         mmread(
-            "results/analysis/performance_evaluation/reconstruction/scmm_counts_atac_rs"
+            "../results/other_models/scMM/scmm_counts_atac_rs"
             + str(seed)
             + ".mtx"
         ).todense()
@@ -192,7 +193,7 @@ for count, seed in enumerate(random_seeds):
         metrics_df = metrics_df.append(df_temp)
 
 metrics_df.to_csv(
-    "results/analysis/performance_evaluation/reconstruction/scMM_brain_recon_performance.csv"
+    "../results/analysis/performance_evaluation/reconstruction/scMM_brain_recon_performance.csv"
 )
 
 print("done")

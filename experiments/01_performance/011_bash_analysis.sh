@@ -27,4 +27,4 @@ python3 ./analysis/reconstruction_performance_test.py --data_index 2
 python3 ./analysis/reconstruction_performance_test_scmm.py
 python3 ./analysis/scmm_brain.py
 python3 ./analysis/cobolt_clustering.py
-python3 ./analysis/clustering_and_batch_effect.py
+#python3 ./analysis/clustering_and_batch_effect.py
