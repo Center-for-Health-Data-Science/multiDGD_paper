@@ -9,14 +9,20 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--random_seed", type=int, default=0)
+parser.add_argument("--epochs", type=int, default=1000)
+parser.add_argument("--train_minimum", type=int, default=100)
+parser.add_argument("--stop_after", type=int, default=20)
 args = parser.parse_args()
 random_seed = args.random_seed
+epochs = args.epochs
+train_minimum = args.train_minimum
+stop_after = args.stop_after
 print("training multiDGD on mouse gastrulation data with random seed ", random_seed)
 
 ###
 # load data
 ###
-mudata = md.read("data/mouse_gastrulation.h5mu", backed=False)
+mudata = md.read("../../data/mouse_gastrulation.h5mu", backed=False)
 train_val_split = [
     list(np.where(mudata.obs["train_val_test"] == "train")[0]),
     list(np.where(mudata.obs["train_val_test"] == "validation")[0]),
@@ -38,7 +44,7 @@ model = DGD(
     train_validation_split=train_val_split,
     meta_label="celltype",
     correction="stage",
-    save_dir="./results/trained_models/mouse_gastrulation/",
+    save_dir="../results/trained_models/mouse_gastrulation/",
     model_name="mouse_gast_l20_h2-2_rs" + str(random_seed),
     random_seed=random_seed,
 )
@@ -46,7 +52,7 @@ model = DGD(
 ###
 # train and save
 ###
-model.train(n_epochs=1000, train_minimum=100, developer_mode=True, stop_after=20)
+model.train(n_epochs=epochs, train_minimum=train_minimum, developer_mode=True, stop_after=stop_after)
 model.save()
 print("   model saved")
 
