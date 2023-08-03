@@ -1,3 +1,4 @@
+import os
 import scvi
 import pandas as pd
 from omicsdgd import DGD
@@ -13,14 +14,6 @@ from omicsdgd.functions._analysis import (
     gmm_clustering,
 )
 
-
-def cluster_dgd(mod, norm=True):
-    classes = list(mod.train_set.meta.unique())
-    true_labels = np.asarray([classes.index(i) for i in mod.train_set.meta])
-    cluster_labels = gmm_clustering(mod.representation, mod.gmm, mod.train_set.meta)
-    return cluster_labels
-
-
 # define seed in command line
 import argparse
 
@@ -32,7 +25,23 @@ parser.add_argument("--data_index", type=int, default=0, help=help_string)
 args = parser.parse_args()
 data_index = args.data_index
 
-save_dir = "results/trained_models/"
+###########################
+# helper function
+###########################
+
+def cluster_dgd(mod):
+    #classes = list(mod.train_set.meta.unique())
+    #true_labels = np.asarray([classes.index(i) for i in mod.train_set.meta])
+    cluster_labels = gmm_clustering(mod.representation, mod.gmm, mod.train_set.meta)
+    return cluster_labels
+
+###########################
+# setup
+###########################
+
+model_dir = "../results/trained_models/"
+data_dir = "../../data/"
+
 data_names = ["human_bonemarrow", "mouse_gastrulation", "human_brain"]
 model_names_all = [
     [
@@ -60,31 +69,39 @@ model_names_all = [
         ],
     ],
 ]
+# select data and model based on data set index
 data_name = data_names[data_index]
 model_names = model_names_all[data_index]
+# meta data
 random_seeds = [0, 37, 8790]
 plotting_keys = ["cell_type", "celltype", "celltype"]
 leiden_resolutions = [1, 2, 1]
 correction = ["Site", "stage", None]
 
-"""
-Go through datasets and chosen models and compute reconstruction performances
-"""
+###########################
+###########################
+# Go through datasets and chosen models and compute reconstruction performances
+###########################
+###########################
 
 if data_name == "human_bonemarrow":
-    data = ad.read_h5ad("data/human_bonemarrow.h5ad")
+    data = ad.read_h5ad(data_dir+"human_bonemarrow.h5ad")
     modality_switch = 13431
+    data.X = data.layers["counts"] # I seem to have to do it again
 else:
+    # have to make these anndata objects for MultiVI to work
     import scipy
-
     if data_name == "mouse_gastrulation":
-        mdata = md.read("data/mouse_gastrulation.h5ad", backed=False)
+        mdata = md.read(data_dir+"mouse_gastrulation.h5mu", backed=False)
     elif data_name == "human_brain":
-        mdata = md.read("data/human_brain.h5ad", backed=False)
-    data = ad.AnnData(scipy.sparse.hstack((mdata["rna"].X, mdata["atac"].X)))
+        mdata = md.read(data_dir+"human_brain.h5mu", backed=False)
+    data = ad.AnnData(scipy.sparse.hstack((mdata['rna'].X,mdata['atac'].X)))
     data.obs = mdata.obs
     modality_switch = mdata["rna"].shape[1]
+    data.var = mdata.var
+    data.var['feature_types'] = ['rna']*modality_switch+['atac']*(data.shape[1]-modality_switch)
     mdata = None
+
 train_indices = list(np.where(data.obs["train_val_test"] == "train")[0])
 test_indices = list(np.where(data.obs["train_val_test"] == "test")[0])
 trainset = data[train_indices, :]
@@ -112,9 +129,9 @@ for count, model_name in enumerate(model_names[1]):
 
     # compute for DGD
     model = DGD.load(
-        data=trainset, save_dir=save_dir + data_name + "/", model_name=model_name
+        data=trainset, save_dir=model_dir + data_name + "/", model_name=model_name
     )
-    print("loaded model")
+    print("   loaded model")
     if data_name == "human_brain":
         metrics_temp = testset_reconstruction_evaluation(
             testset, model, modality_switch, library, thresholds=[0.2], batch_size=32
@@ -132,8 +149,8 @@ for count, model_name in enumerate(model_names[1]):
     # ASW
     asw = None
     if correction[data_index] is not None:
-        data.obsm["latent"] = model.get_latent_representation()
-        asw = silhouette_score(data.obsm["latent"], data.obs[correction])
+        trainset.obsm["latent"] = model.get_latent_representation()
+        asw = silhouette_score(trainset.obsm["latent"], trainset.obs[correction[data_index]])
     model = None
     metrics_temp["ARI"] = radj
     metrics_temp["ASW"] = asw
@@ -170,7 +187,7 @@ else:
 for count, model_name in enumerate(model_names[0]):
     print(model_name)
     model = scvi.model.MULTIVI.load(
-        save_dir + "multiVI/" + data_name + "/" + model_name, adata=trainset
+        model_dir + "multiVI/" + data_name + "/" + model_name, adata=trainset
     )
     if data_name == "human_brain":
         metrics_temp = testset_reconstruction_evaluation(
@@ -183,6 +200,8 @@ for count, model_name in enumerate(model_names[0]):
     metrics_temp["model"] = "multiVI"
     metrics_temp["random_seed"] = random_seeds[count]
     # now ARI and ASW
+    # get latent representation
+    trainset.obsm["latent"] = model.get_latent_representation()
     # ARI
     sc.pp.neighbors(trainset, use_rep="latent", n_neighbors=15)
     sc.tl.leiden(
@@ -193,8 +212,8 @@ for count, model_name in enumerate(model_names[0]):
     # ASW
     asw = None
     if correction[data_index] is not None:
-        data.obsm["latent"] = model.get_latent_representation()
-        asw = silhouette_score(data.obsm["latent"], data.obs[correction])
+        trainset.obsm["latent"] = model.get_latent_representation()
+        asw = silhouette_score(trainset.obsm["latent"], trainset.obs[correction[data_index]])
     model = None
     metrics_temp["ARI"] = radj
     metrics_temp["ASW"] = asw
@@ -202,10 +221,15 @@ for count, model_name in enumerate(model_names[0]):
         metrics_mvi = metrics_temp
     else:
         metrics_mvi = metrics_mvi.append(metrics_temp)
+    print("   calculated")
 
 metrics_df = pd.concat([metrics_mvi, metrics_dgd])
+# make sure the path exists
+saving_path = "../results/analysis/performance_evaluation/reconstruction/"
+if not os.path.exists(saving_path):
+    os.makedirs(saving_path)
 metrics_df.to_csv(
-    "results/analysis/performance_evaluation/reconstruction/" + data_name + ".csv"
+    saving_path + data_name + ".csv"
 )
 
 print("   done")
