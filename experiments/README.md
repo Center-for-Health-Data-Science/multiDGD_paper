@@ -2,6 +2,14 @@
 
 Our experiments folder is structured according to the order in which they appear in our manuscript. Every folder contains subfolders for training and testing models (if applicable), analysis and figures.
 
+For everything to go smoothely, we recommend that you create a conda environment with all the necessary dependencies and the local package. We collected everythin in a bash script, so just run the following command from this directory:
+
+```
+bash install_environment.sh
+```
+
+Now you can go ahead with the experiments. Please remember to execute them from the respective experiment subfolders. Because of refactoring of code for the multiDGD package, the pretrained models on Figshare might not be compatible with this code. We provided the trained models and some intermediate results in [this google drive folder](https://drive.google.com/drive/folders/19AiLXfBBgwGat0S6QVvK5IqK0jC4TXS0?usp=sharing).
+
 ### 01_performance
 
 This folder refers to Sections `2.2 Improved performance on data reconstruction and clustering` and `2.3 Probabilistic modelling of batch effects`. It contains most training and analysis in this work.

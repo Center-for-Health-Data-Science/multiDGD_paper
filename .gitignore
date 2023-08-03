@@ -160,10 +160,12 @@ cython_debug/
 #.idea/
 
 # data and models
-data/
+data/raw/
+wandb/
 *.pt
 *.json
-*.csv
+*.h5ad
+*.h5mu
 
 # mac stuff
 .DS_Store
