@@ -17,7 +17,9 @@ from omicsdgd.functions._analysis import (
     gmm_make_confusion_matrix,
 )
 
-save_dir = "results/trained_models/"
+save_dir = "../results/trained_models/"
+metric_dir = "../results/analysis/performance_evaluation/"
+data_dir = "../../data/"
 data_name = "human_bonemarrow"
 model_name = "human_bonemarrow_l20_h2-3_test10e"  # this is just a speficiation of the model after test set inference
 
@@ -67,19 +69,20 @@ trans = mtransforms.ScaledTranslation(-20 / 72, 7 / 72, fig.dpi_scale_trans)
 ####################################
 ####################################
 # load needed analysis data
+"""
 clustering_df = pd.read_csv(
-    "results/analysis/performance_evaluation/clustering_and_batch_effects_multiome.csv"
+    metric_dir+"clustering_and_batch_effects_multiome.csv"
 )
 clustering_df["ARI"] = clustering_df["ARI"].round(2)
 clustering_df["ASW"] = clustering_df["ASW"].round(2)
 clustering_cobolt = pd.read_csv(
-    "results/analysis/performance_evaluation/cobolt_human_brain_aris.csv"
+    metric_dir+"cobolt_human_brain_aris.csv"
 )
 clustering_cobolt["data"] = "brain (H)"
 clustering_cobolt["ARI"] = clustering_cobolt["ARI"].round(2)
 multimodel_clustering = pd.concat([clustering_df, clustering_cobolt], axis=0)
 clustering_scmm = pd.read_csv(
-    "results/analysis/performance_evaluation/scmm_human_brain_aris.csv"
+    metric_dir+"scmm_human_brain_aris.csv"
 )
 clustering_scmm["ARI"] = clustering_scmm["ARI"].round(2)
 multimodel_clustering = pd.concat([multimodel_clustering, clustering_scmm], axis=0)
@@ -101,29 +104,46 @@ multimodel_clustering["model"] = multimodel_clustering["model"].astype("category
 multimodel_clustering["model"] = multimodel_clustering["model"].cat.set_categories(
     ["MultiVI", "Cobolt", "scMM", "multiDGD"]
 )
+"""
 
+###
+# load and combine reconstruction performances of all datasets (for MultiVI and multiDGD)
+###
 reconstruction_temp = pd.read_csv(
-    "results/analysis/performance_evaluation/reconstruction/human_bonemarrow.csv"
+    metric_dir+"reconstruction/human_bonemarrow.csv"
 )
 reconstruction_df = reconstruction_temp
 reconstruction_temp["data"] = "marrow"
 reconstruction_temp = pd.read_csv(
-    "results/analysis/performance_evaluation/reconstruction/mouse_gastrulation.csv",
-    sep=";",
+    metric_dir+"reconstruction/mouse_gastrulation.csv"
 )
 reconstruction_temp["data"] = "gastrulation"
 reconstruction_df = pd.concat([reconstruction_df, reconstruction_temp], axis=0)
 reconstruction_temp = pd.read_csv(
-    "results/analysis/performance_evaluation/reconstruction/human_brain.csv"
+    metric_dir+"reconstruction/human_brain.csv"
 )
 reconstruction_temp["data"] = "brain"
 reconstruction_df = pd.concat([reconstruction_df, reconstruction_temp], axis=0)
+
+###
+# extract clustering information and shorten the original df
+###
+# make clustering df from relevant columns of reconstruction_df
+clustering_df = reconstruction_df[
+    ["data", "model", "random_seed", "ARI", "ASW"]
+].copy()
+reconstruction_df = reconstruction_df.drop(columns=["ARI", "ASW"])
+
+###
+# get and add the reconstruction performance for newly compared models
+###
 reconstruction_temp = pd.read_csv(
-    "results/analysis/performance_evaluation/reconstruction/scMM_brain_recon_performance.csv"
+    metric_dir+"reconstruction/scMM_brain_recon_performance.csv"
 )
 reconstruction_temp["data"] = "brain"
 # sort the data columns by the order of reconstruction_df
-reconstruction_temp = reconstruction_temp[reconstruction_df.columns]
+#reconstruction_temp = reconstruction_temp[reconstruction_df.columns] # this throws a keyerror
+reconstruction_temp = reconstruction_temp.reindex(sorted(reconstruction_df.columns), axis=1)
 reconstruction_df = pd.concat([reconstruction_df, reconstruction_temp], axis=0)
 reconstruction_df = reconstruction_df.drop(columns=["random_seed", "binary_threshold"])
 reconstruction_df.reset_index(drop=True, inplace=True)
@@ -135,6 +155,20 @@ reconstruction_df["model"] = reconstruction_df["model"].astype("category")
 reconstruction_df["model"] = reconstruction_df["model"].cat.set_categories(
     ["MultiVI", "scMM", "multiDGD"]
 )
+
+###
+# now add the clustering results from cobolt and scmm
+###
+clustering_cobolt = pd.read_csv(
+    metric_dir+"cobolt_human_brain_aris.csv"
+)
+clustering_cobolt["data"] = "brain"
+clustering_scmm = pd.read_csv(
+    metric_dir+"scmm_human_brain_aris.csv"
+)
+clustering_scmm["data"] = "brain"
+multimodel_clustering = pd.concat([clustering_df, clustering_cobolt, clustering_scmm], axis=0)
+#clustering_df["ARI"] = clustering_df["ARI"].round(2)
 
 ###############
 # reconstruction performance (RMSE, Accuracy, ...) of DGD (also make binary atac trained version) and MultiVI
@@ -309,11 +343,11 @@ print("finished row 1: performance metrics")
 # load model for this and next block
 cluster_class_neworder, class_palette = make_palette_from_meta(data_name)
 column_names = ["UMAP D1", "UMAP D2"]
-if not os.path.exists("results/analysis/performance_evaluation/bonemarrow_umap.csv"):
+if not os.path.exists(metric_dir+"bonemarrow_umap.csv"):
     data_name = "human_bonemarrow"
     import anndata as ad
 
-    adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+    adata = ad.read_h5ad(data_dir + data_name + ".h5ad")
     train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
     trainset = adata[train_indices, :]
     model = DGD.load(
@@ -369,22 +403,22 @@ if not os.path.exists("results/analysis/performance_evaluation/bonemarrow_umap.c
     projected_gmm = pd.concat([projected_gmm, gmm_samples], axis=0)
     # save files
     plot_data.to_csv(
-        "results/analysis/performance_evaluation/bonemarrow_umap.csv", index=False
+        metric_dir+"bonemarrow_umap.csv", index=False
     )
     correction_df.to_csv(
-        "results/analysis/performance_evaluation/bonemarrow_correction_umap.csv",
+        metric_dir+"bonemarrow_correction_umap.csv",
         index=False,
     )
     train_test_df.to_csv(
-        "results/analysis/performance_evaluation/bonemarrow_train_test_umap.csv",
+        metric_dir+"bonemarrow_train_test_umap.csv",
         index=False,
     )
     projected_gmm.to_csv(
-        "results/analysis/performance_evaluation/bonemarrow_gmm_umap.csv", index=False
+        metric_dir+"bonemarrow_gmm_umap.csv", index=False
     )
 else:
     plot_data = pd.read_csv(
-        "results/analysis/performance_evaluation/bonemarrow_umap.csv"
+        metric_dir+"bonemarrow_umap.csv"
     )
     plot_data["cell type"] = plot_data["cell type"].astype("category")
     plot_data["cell type"] = plot_data["cell type"].cat.set_categories(
@@ -395,21 +429,21 @@ else:
         ["site1", "site2", "site3", "site4"]
     )
     correction_df = pd.read_csv(
-        "results/analysis/performance_evaluation/bonemarrow_correction_umap.csv"
+        metric_dir+"bonemarrow_correction_umap.csv"
     )
     correction_df["batch"] = correction_df["batch"].astype("category")
     correction_df["batch"] = correction_df["batch"].cat.set_categories(
         ["site1", "site2", "site3", "site4"]
     )
     train_test_df = pd.read_csv(
-        "results/analysis/performance_evaluation/bonemarrow_train_test_umap.csv"
+        metric_dir+"bonemarrow_train_test_umap.csv"
     )
     train_test_df["data set"] = train_test_df["data set"].astype("category")
     train_test_df["data set"] = train_test_df["data set"].cat.set_categories(
         ["train", "test"]
     )
     projected_gmm = pd.read_csv(
-        "results/analysis/performance_evaluation/bonemarrow_gmm_umap.csv"
+        metric_dir+"bonemarrow_gmm_umap.csv"
     )
 
 ax_list.append(plt.subplot(gs[4:8, 0:3]))
@@ -525,12 +559,12 @@ ax_list[-1].text(
 )
 # compute clustering of trained latent space
 if not os.path.exists(
-    "results/analysis/performance_evaluation/bonemarrow_cluster_map.csv"
+    metric_dir+"bonemarrow_cluster_map.csv"
 ):
     data_name = "human_bonemarrow"
     import anndata as ad
 
-    adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+    adata = ad.read_h5ad(data_dir + data_name + ".h5ad")
     train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
     trainset = adata[train_indices, :]
     model = DGD.load(
@@ -538,20 +572,20 @@ if not os.path.exists(
     )
     df_relative_clustering = gmm_make_confusion_matrix(model)
     df_relative_clustering.to_csv(
-        "results/analysis/performance_evaluation/bonemarrow_cluster_map.csv"
+        metric_dir+"bonemarrow_cluster_map.csv"
     )
 else:
     df_relative_clustering = pd.read_csv(
-        "results/analysis/performance_evaluation/bonemarrow_cluster_map.csv",
+        metric_dir+"bonemarrow_cluster_map.csv",
         index_col=0,
     )
 if not os.path.exists(
-    "results/analysis/performance_evaluation/bonemarrow_cluster_map_nonorm.csv"
+    metric_dir+"bonemarrow_cluster_map_nonorm.csv"
 ):
     data_name = "human_bonemarrow"
     import anndata as ad
 
-    adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+    adata = ad.read_h5ad(data_dir + data_name + ".h5ad")
     train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
     trainset = adata[train_indices, :]
     model = DGD.load(
@@ -559,11 +593,11 @@ if not os.path.exists(
     )
     df_clustering = gmm_make_confusion_matrix(model, norm=False)
     df_clustering.to_csv(
-        "results/analysis/performance_evaluation/bonemarrow_cluster_map_nonorm.csv"
+        metric_dir+"bonemarrow_cluster_map_nonorm.csv"
     )
 else:
     df_clustering = pd.read_csv(
-        "results/analysis/performance_evaluation/bonemarrow_cluster_map_nonorm.csv",
+        metric_dir+"bonemarrow_cluster_map_nonorm.csv",
         index_col=0,
     )
 
@@ -615,12 +649,12 @@ ax_list[-1].text(
 )
 print("getting mouse correction rep")
 if not os.path.exists(
-    "results/analysis/performance_evaluation/gastrulation_correction.csv"
+    metric_dir+"gastrulation_correction.csv"
 ):
     data_name = "mouse_gastrulation"
     import mudata as md
 
-    mudata = md.load_data("data/" + data_name + ".h5mu")
+    mudata = md.read(data_dir + data_name + ".h5mu", backed=False)
     train_indices = list(np.where(mudata.obs["train_val_test"] == "train")[0])
     trainset = mudata[train_indices, :]
     mudata = None
@@ -636,12 +670,12 @@ if not os.path.exists(
     correction_df["batch"] = batch_labels
     correction_df["batch"] = correction_df["batch"].astype("category")
     correction_df.to_csv(
-        "results/analysis/performance_evaluation/gastrulation_correction.csv",
+        metric_dir+"gastrulation_correction.csv",
         index=False,
     )
 else:
     correction_df = pd.read_csv(
-        "results/analysis/performance_evaluation/gastrulation_correction.csv"
+        metric_dir+"gastrulation_correction.csv"
     )
     correction_df["batch"] = correction_df["batch"].astype("category")
 # batch_palette = ['palegoldenrod', 'cornflowerblue', 'coral', 'darkmagenta', 'darkslategray']
@@ -677,7 +711,7 @@ ax_list[-1].set_ylabel(r"$Z^{cov}$ D2")
 ####################################
 
 plt.savefig(
-    "results/analysis/plots/performance_evaluation/fig2_v5.png",
+    "../results/analysis/plots/fig2_v5.png",
     dpi=300,
     bbox_inches="tight",
 )

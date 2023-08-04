@@ -52,7 +52,7 @@ aris_out = []
 for i, seed in enumerate(random_seeds):
     print("seed: ", seed)
     if not os.path.exists(
-        save_dir+"scmm_"
+        "../results/other_models/scMM/scmm_"
         + data_name
         + "_rs"
         + str(random_seeds[i])
@@ -121,7 +121,7 @@ for i, seed in enumerate(random_seeds):
         plot_data["ARI"] = radj
         aris_out.append(radj)
         plot_data.to_csv(
-            "../results/analysis/performance_evaluation/scmm_"
+            "../results/other_models/scMM/scmm_"
             + data_name
             + "_rs"
             + str(random_seeds[i])
@@ -130,7 +130,7 @@ for i, seed in enumerate(random_seeds):
         )
     else:
         plot_data = pd.read_csv(
-            "../results/analysis/performance_evaluation/scmm_"
+            "../results/other_models/scMM/scmm_"
             + data_name
             + "_rs"
             + str(random_seeds[i])
@@ -166,10 +166,10 @@ for i, seed in enumerate(random_seeds):
         ax_list[-1].legend().remove()
 if len(aris_out) > 0:
     # save aris as data frame with columns 'data', 'model', 'random seed', 'ARI'
-    aris_df = pd.DataFrame(columns=["data", "model", "random seed", "ARI"])
+    aris_df = pd.DataFrame(columns=["data", "model", "random_seed", "ARI"])
     aris_df["data"] = ["brain (H)"] * len(random_seeds)
     aris_df["model"] = ["scMM"] * len(random_seeds)
-    aris_df["random seed"] = random_seeds
+    aris_df["random_seed"] = random_seeds
     aris_df["ARI"] = aris_out
     aris_df.to_csv(
         "../results/analysis/performance_evaluation/scmm_" + data_name + "_aris.csv",

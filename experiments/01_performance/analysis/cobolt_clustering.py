@@ -164,17 +164,19 @@ for i, seed in enumerate(random_seeds):
         )
     else:
         ax_list[-1].legend().remove()
+
 if len(aris_out) > 0:
     # save aris as data frame with columns 'data', 'model', 'random seed', 'ARI'
-    aris_df = pd.DataFrame(columns=["data", "model", "random seed", "ARI"])
+    aris_df = pd.DataFrame(columns=["data", "model", "random_seed", "ARI"])
     aris_df["data"] = ["brain (H)"] * len(random_seeds)
     aris_df["model"] = ["cobolt"] * len(random_seeds)
-    aris_df["random seed"] = random_seeds
+    aris_df["random_seed"] = random_seeds
     aris_df["ARI"] = aris_out
     aris_df.to_csv(
         "../results/analysis/performance_evaluation/cobolt_" + data_name + "_aris.csv",
         index=False,
     )
+    print("saved ARI results to file")
 
 plt.savefig(
     "../results/analysis/plots/performance_evaluation/fig_supp_cobolt_latent.png",
