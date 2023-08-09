@@ -1,0 +1,7 @@
+anndata==0.9.1
+h5py==3.8.0
+mudata==0.2.3
+scanpy==1.9.3
+scvi-tools==1.0.0
+wandb==0.15.4
+leidenalg==0.10.0

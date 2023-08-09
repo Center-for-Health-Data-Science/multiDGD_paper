@@ -1,0 +1,17 @@
+;cell_type;Name;lineage;;;
+;GluN1;Glutamatergic neuron 1;Neuron;;;
+;GluN2;Glutamatergic neuron 2;Neuron;;;
+;GluN3;Glutamatergic neuron 3;Neuron;;;
+;GluN4;Glutamatergic neuron 4;Neuron;;;
+;GluN5;Glutamatergic neuron 5;Neuron;;;
+;GluN6;Glutamatergic neuron 6;Neuron;;;
+;GluN7;Glutamatergic neuron 7;Neuron;;;
+;nIPC;Neuronal intermediate progenitor cell;Progenitor cell;;;
+;RG;Radial glia;Glia;;;
+;mGPC/OPC;Multipotent glial progenitor cell/ oligodendrocyte progenitor cell;Progenitor cell;;;
+;MG/EC/Peric.;Microglia/ endothelial cell/ pericytes;Progenitor cell;;;
+;SP;Subplate;Plate;;;
+;IN1;Interneuron 1;Neuron;;;
+;IN2;Interneuron 2;Neuron;;;
+;IN3;Interneuron 3;Neuron;;;
+;IN4;Interneuron 4;Neuron;;;

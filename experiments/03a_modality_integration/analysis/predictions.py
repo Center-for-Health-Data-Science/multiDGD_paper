@@ -14,65 +14,30 @@ from omicsdgd.functions._analysis import make_palette_from_meta
 save_dir = "results/trained_models/"
 data_name = "human_bonemarrow"
 model_name = "human_bonemarrow_l20_h2-3_rs0_unpaired0percent"
-#model_name = "human_bonemarrow_l20_h2-3_test10e"
-#model_name = "human_bonemarrow_l20_h2-3_test50e"
 fraction_unpaired = 0.
-# fraction_unpaired_options = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
 ####################
 # prepare data and load model
-####################
-is_train_df = pd.read_csv("data/" + data_name + "/train_val_test_split.csv")
-train_indices = is_train_df[is_train_df["is_train"] == "train"]["num_idx"].values
-df_unpaired = pd.read_csv("data/" + data_name + "/unpairing.csv")
-adata = ad.read_h5ad("data/" + data_name + "/GSE194122_openproblems_neurips2021_multiome_BMMC_processed.h5ad")
-adata.X = adata.layers["counts"]
+####################data_name = "human_bonemarrow"
+adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+train_indices = np.where(adata.obs["train_val_test"] == "train")[0]
+trainset = adata[train_indices, :].copy()
+test_indices = np.where(adata.obs["train_val_test"] == "test")[0]
+adata_test = adata[test_indices, :].copy()
 modality_switch = np.where(adata.var["feature_types"] == "ATAC")[0][0]
-print(modality_switch)
-# make test set now to be able to free memory earlier
-adata_test = adata[is_train_df[is_train_df["is_train"] == "iid_holdout"]["num_idx"].values, :].copy()
 print("loaded data")
 
-if fraction_unpaired == 0.0:
-    model = DGD.load(data=adata[train_indices, :], save_dir=save_dir + data_name + "/", model_name=model_name)
-    adata = None
-else:
-    mod_1_indices = df_unpaired[
-        (df_unpaired["fraction_unpaired"] == fraction_unpaired) & (df_unpaired["modality"] == "rna")
-    ]["sample_idx"].values
-    mod_2_indices = df_unpaired[
-        (df_unpaired["fraction_unpaired"] == fraction_unpaired) & (df_unpaired["modality"] == "atac")
-    ]["sample_idx"].values
-    if fraction_unpaired < 1.:
-        # train-validation-test split for reproducibility
-        remaining_indices = df_unpaired[
-            (df_unpaired["fraction_unpaired"] == fraction_unpaired) & (df_unpaired["modality"] == "paired")
-        ]["sample_idx"].values
-        print("made indices")
-        adata_rna = adata[mod_1_indices, adata.var["feature_types"] == "GEX"].copy()
-        print("copied rna")
-        adata_atac = adata[mod_2_indices, adata.var["feature_types"] == "ATAC"].copy()
-        print("copied atac")
-        adata_multi = adata[remaining_indices, :].copy()
-        print("copied rest")
-        adata_unpaired = scvi.data.organize_multiome_anndatas(adata_multi, adata_rna, adata_atac)
-        print("organized data")
-        adata_rna, adata_atac, adata_multi = None, None, None
-
-        model = DGD.load(data=adata_unpaired, save_dir=save_dir + data_name + "/", model_name=model_name)
-        adata_unpaired = None
-    else:
-        adata_unpaired = adata[mod_1_indices,:].copy()
-        adata_unpaired.obs['modality'] = 'GEX'
-        adata_temp = adata[mod_2_indices,:].copy()
-        adata_temp.obs['modality'] = 'ATAC'
-        adata_unpaired = adata_unpaired.concatenate(adata_temp)
-        print("organized data")
-        adata, adata_temp = None, None
-        model = DGD.load(data=adata_unpaired, save_dir=save_dir + data_name + "/", model_name=model_name)
-        adata_unpaired = None
-print("loaded model")
-
+##############
+# load model
+##############
+model = DGD.load(
+    data=trainset,
+    save_dir=save_dir + data_name + "/",
+    model_name='human_bonemarrow_l20_h2-3_rs0_unpaired0percent',
+)
+# change the model name so that the original test representations will not be overwritten
+model._model_name = 'human_bonemarrow_l20_h2-3_rs0_unpaired0percent'
+print("   loaded")
 
 ####################
 # get predictions and save
@@ -122,7 +87,7 @@ def get_balanced_accuracy(preds, targets, scalings):
 
 
 # get predictions
-n_test_samples = len(is_train_df[is_train_df["is_train"] == "iid_holdout"])
+n_test_samples = len(adata_test)
 print("number of test samples and shape of learned representation")
 print(n_test_samples)
 print(model.test_rep.z.shape)

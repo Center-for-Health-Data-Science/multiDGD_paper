@@ -11,16 +11,20 @@ import os
 from omicsdgd import DGD
 import umap.umap_ as umap
 import matplotlib.transforms as mtransforms
-from omicsdgd.functions._data_manipulation import load_testdata_as_anndata, load_data_from_name
 from omicsdgd.functions._analysis import make_palette_from_meta
 
 import anndata as ad
+import mudata as md
 import scipy
 import scvi
 
 #####################
 # define model names, directory and batches
 #####################
+
+save_dir = "../results/trained_models/"
+data_dir = "../../data/"
+metric_dir = "../results/analysis/performance_evaluation/"
 
 ####################################
 # flexible parameters
@@ -74,7 +78,6 @@ trans = mtransforms.ScaledTranslation(-20/72, 7/72, fig.dpi_scale_trans)
 # load data
 #####################
 # first load the data for labels
-save_dir = 'results/trained_models/'
 data_names = ["human_bonemarrow", "mouse_gastrulation"]
 dgd_names = ['human_bonemarrow_l20_h2-3', 'mouse_gast_l20_h2-2_rs0']
 batch_names = ['Site', 'stage']
@@ -98,28 +101,21 @@ for i, data_name in enumerate(data_names):
     model_name = dgd_names[i]
     cluster_class_neworder, class_palette = make_palette_from_meta(data_name)
     column_names = ['UMAP D1', 'UMAP D2']
-    if not os.path.exists('results/analysis/performance_evaluation/dgd_'+data_name+'_cov_umap.csv'):
+    if not os.path.exists(metric_dir+'dgd_'+data_name+'_cov_umap.csv'):
         print('making umap for data '+data_name)
-        is_train_df = pd.read_csv('data/'+data_name+'/train_val_test_split.csv')
-        if data_name != 'human_brain':
-            trainset, testset, modality_switch, library = load_testdata_as_anndata(data_name)
+        if data_name == 'human_bonemarrow':
+            data = ad.read_h5ad(data_dir+"human_bonemarrow.h5ad")
+            modality_switch = 13431
         else:
-            data = load_data_from_name(data_name)
-            #print(data)
-            modality_switch = data['rna'].X.shape[1]
-            adata = ad.AnnData(scipy.sparse.hstack((data['rna'].X,data['atac'].X)))
+            data = md.read(data_dir+data_name+'.h5mu')
+            modality_switch = data['rna'].shape[1]
+            adata = ad.AnnData(scipy.sparse.hstack((data['rna'],data['atac'])))
             adata.obs = data['rna'].obs
             adata.var = pd.DataFrame(index=data['rna'].var_names.tolist()+data['atac'].var_names.tolist(),
-                                    data={'name': data['rna'].var['name'].values.tolist()+data['atac'].var['name'].values.tolist(),
-                                        'feature_types': ['rna']*modality_switch+['atac']*(adata.shape[1]-modality_switch)})
-            data = None
+                                    data={'feature_types': ['rna']*modality_switch+['atac']*(adata.shape[1]-modality_switch)})
             data = adata
-            train_indices = is_train_df[is_train_df['is_train'] == 'train']['num_idx'].values
-            test_indices = is_train_df[is_train_df['is_train'] == 'iid_holdout']['num_idx'].values
-            if not isinstance(data.X, scipy.sparse.csc_matrix):# type(data.X) is not scipy.sparse._csc.csc_matrix:
-                data.X = data.X.tocsr()
-            trainset = data.copy()[train_indices]
-            print(trainset)
+        train_indices = list(np.where(data.obs["train_val_test"] == "train")[0])
+        trainset = data[train_indices, :]
 
 
         model = DGD.load(data=trainset,
@@ -143,17 +139,17 @@ for i, data_name in enumerate(data_names):
         plot_data['batch'] = batch_labels
         plot_data['batch'] = plot_data['batch'].astype("category")
         plot_data['data set'] = 'train'
-        plot_data.to_csv('results/analysis/performance_evaluation/dgd_'+data_name+'_cov_umap.csv', index=False)
+        plot_data.to_csv(metric_dir+'dgd_'+data_name+'_cov_umap.csv', index=False)
         corr_data = pd.DataFrame(cov_rep, columns=["D1", "D2"])
         corr_data['batch'] = batch_labels
         corr_data['batch'] = corr_data['batch'].astype("category")
-        corr_data.to_csv('results/analysis/performance_evaluation/dgd_'+data_name+'_cov_rep.csv', index=False)
+        corr_data.to_csv(metric_dir+'dgd_'+data_name+'_cov_rep.csv', index=False)
     else:
-        plot_data = pd.read_csv('results/analysis/performance_evaluation/dgd_'+data_name+'_cov_umap.csv')
+        plot_data = pd.read_csv(metric_dir+'dgd_'+data_name+'_cov_umap.csv')
         plot_data['cell type'] = plot_data['cell type'].astype("category")
         plot_data['cell type'] = plot_data['cell type'].cat.set_categories(cluster_class_neworder)
         plot_data['batch'] = plot_data['batch'].astype("category")
-        corr_data = pd.read_csv('results/analysis/performance_evaluation/dgd_'+data_name+'_cov_rep.csv')
+        corr_data = pd.read_csv(metric_dir+'dgd_'+data_name+'_cov_rep.csv')
         corr_data['batch'] = corr_data['batch'].astype("category")
     
     ax_list.append(plt.subplot(gs[i,0]))
@@ -212,28 +208,21 @@ for i, data_name in enumerate(data_names):
     model_name = mvi_names[i]
     cluster_class_neworder, class_palette = make_palette_from_meta(data_name)
     column_names = ['UMAP D1', 'UMAP D2']
-    if not os.path.exists('results/analysis/performance_evaluation/mvi_'+data_name+'_cov_umap.csv'):
+    if not os.path.exists(metric_dir+'mvi_'+data_name+'_cov_umap.csv'):
         print('making umap for data '+data_name)
-        is_train_df = pd.read_csv('data/'+data_name+'/train_val_test_split.csv')
-        if data_name != 'human_brain':
-            trainset, testset, modality_switch, library = load_testdata_as_anndata(data_name)
+        if data_name == 'human_bonemarrow':
+            data = ad.read_h5ad(data_dir+"human_bonemarrow.h5ad")
+            modality_switch = 13431
         else:
-            data = load_data_from_name(data_name)
-            #print(data)
-            modality_switch = data['rna'].X.shape[1]
-            adata = ad.AnnData(scipy.sparse.hstack((data['rna'].X,data['atac'].X)))
+            data = md.read(data_dir+data_name+'.h5mu')
+            modality_switch = data['rna'].shape[1]
+            adata = ad.AnnData(scipy.sparse.hstack((data['rna'],data['atac'])))
             adata.obs = data['rna'].obs
             adata.var = pd.DataFrame(index=data['rna'].var_names.tolist()+data['atac'].var_names.tolist(),
-                                    data={'name': data['rna'].var['name'].values.tolist()+data['atac'].var['name'].values.tolist(),
-                                        'feature_types': ['rna']*modality_switch+['atac']*(adata.shape[1]-modality_switch)})
-            data = None
+                                    data={'feature_types': ['rna']*modality_switch+['atac']*(adata.shape[1]-modality_switch)})
             data = adata
-            train_indices = is_train_df[is_train_df['is_train'] == 'train']['num_idx'].values
-            test_indices = is_train_df[is_train_df['is_train'] == 'iid_holdout']['num_idx'].values
-            if not isinstance(data.X, scipy.sparse.csc_matrix):# type(data.X) is not scipy.sparse._csc.csc_matrix:
-                data.X = data.X.tocsr()
-            trainset = data.copy()[train_indices]
-            print(trainset)
+        train_indices = list(np.where(data.obs["train_val_test"] == "train")[0])
+        trainset = data[train_indices, :]
         
         trainset.var_names_make_unique()
         trainset.obs['modality'] = 'paired'
@@ -265,9 +254,9 @@ for i, data_name in enumerate(data_names):
         plot_data['batch'] = batch_labels
         plot_data['batch'] = plot_data['batch'].astype("category")
         plot_data['data set'] = 'train'
-        plot_data.to_csv('results/analysis/performance_evaluation/mvi_'+data_name+'_cov_umap.csv', index=False)
+        plot_data.to_csv(metric_dir+'mvi_'+data_name+'_cov_umap.csv', index=False)
     else:
-        plot_data = pd.read_csv('results/analysis/performance_evaluation/mvi_'+data_name+'_cov_umap.csv')
+        plot_data = pd.read_csv(metric_dir+'mvi_'+data_name+'_cov_umap.csv')
         plot_data['cell type'] = plot_data['cell type'].astype("category")
         plot_data['cell type'] = plot_data['cell type'].cat.set_categories(cluster_class_neworder)
         plot_data['batch'] = plot_data['batch'].astype("category")
@@ -299,5 +288,5 @@ for i, data_name in enumerate(data_names):
     ax_list[-1].set_yticklabels([])
 
 
-figure_name = "results/analysis/plots/fig_embeddings_supp_covariate"
+figure_name = "../results/analysis/plots/supplementaries/fig_embeddings_supp_covariate"
 plt.savefig(figure_name+".png", dpi=300, bbox_inches="tight")
