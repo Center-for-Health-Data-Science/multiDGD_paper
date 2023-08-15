@@ -5,15 +5,15 @@ Pretrained models are available on Figshare under [https://doi.org/10.6084/m9.fi
 
 ### Training
 
-Script `bash_run.sh` contains all commands to train multiDGD and MultiVI for all three data sets and three random seeds used. For training, it is highly recommended to split this into several parallel runs so it does not have to run for a week. Cobolt and scMM were trained separately on Google Colab. The notebooks are contained in `./training/`.
+Script `010_bash_run.sh` contains all commands to train multiDGD and MultiVI for all three data sets and three random seeds used. For training, it is highly recommended to split this into several parallel runs so it does not have to run for a week. Cobolt and scMM were trained separately on Google Colab. The notebooks are contained in `./training/`.
 
 ### Analysis
 
-Script `bash_analysis.sh` collects the script executions for computing reconstruction errors, adjusted Rand indices and average silhouette widths.
+Script `011_bash_analysis.sh` collects the script executions for computing reconstruction errors, adjusted Rand indices and average silhouette widths.
 
 ### Figures
 
-Here are scripts used to make the figures in the manuscript.
+Figures can be generated based on the intermediate results via `012_bash_plot.sh`.
 
 ## !Note!
 
