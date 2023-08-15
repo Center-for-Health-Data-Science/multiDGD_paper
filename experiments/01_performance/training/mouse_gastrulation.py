@@ -63,3 +63,20 @@ testset = mudata[mudata.obs["train_val_test"] == "test"].copy()
 mudata = None
 model.predict_new(testset)
 print("   test set inferred")
+
+test_recon = model.decoder_forward(model.test_rep.z.shape[0])
+test_recon_gex = test_recon[0].cpu().detach().numpy()
+test_recon_atac = test_recon[1].cpu().detach().numpy()
+np.save(
+    "../results/analysis/performance_evaluation/reconstruction/"
+    + "mouse_gast_l20_h2-2_rs" + str(random_seed)
+    + "_test_recon_gex.npy",
+    test_recon_gex,
+)
+np.save(
+    "../results/analysis/performance_evaluation/reconstruction/"
+    + "mouse_gast_l20_h2-2_rs" + str(random_seed)
+    + "_test_recon_atac.npy",
+    test_recon_atac,
+)
+print("   saved reconstructions")
