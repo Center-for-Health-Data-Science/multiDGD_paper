@@ -15,6 +15,14 @@ Script `011_bash_analysis.sh` collects the script executions for computing recon
 
 Figures can be generated based on the intermediate results via `012_bash_plot.sh`.
 
+## Execution
+
+```
+bash 010_bash_run.sh
+bash 011_bash_analysis.sh
+bash 012_bash_plot.sh
+```
+
 ## !Note!
 
 ***This is still a work in progress, and we hope you have patience with us. We are cleaning and refactoring our code from more than half a year of work for you, so that you can run the experiments from our manuscript.***
