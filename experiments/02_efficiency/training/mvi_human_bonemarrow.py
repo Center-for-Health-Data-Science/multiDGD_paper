@@ -24,12 +24,10 @@ print(
 )
 
 data_name = "human_bonemarrow"
-save_dir = "results/trained_models/multiVI/human_bonemarrow/"
-if not os.path.exists(save_dir):
-    os.makedirs(save_dir)
+save_dir = "../results/trained_models/multiVI/human_bonemarrow/"
 
 # get subset of train indices
-df_subset_ids = pd.read_csv("data/" + data_name + "/data_subsets.csv")
+df_subset_ids = pd.read_csv("../../data/" + data_name + "_data_subsets.csv")
 train_indices = list(
     df_subset_ids[
         (df_subset_ids["fraction"] == fraction) & (df_subset_ids["include"] == 1)
@@ -39,8 +37,10 @@ n_samples = len(train_indices)
 
 # get data
 data_name = "human_bonemarrow"
-adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+adata.X = adata.layers["counts"] # I seem to have to do it again
 adata = adata[train_indices]
+adata.obs["modality"] = "paired"
 adata.var_names_make_unique()
 
 model_name = "l20_e2_d2_rs" + str(random_seed) + "_subset" + str(n_samples)

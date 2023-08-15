@@ -25,20 +25,22 @@ print(
 # load data
 ###
 data_name = "human_bonemarrow"
-adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+adata.X = adata.layers["counts"] # I seem to have to do it again
 
 # get subset of train indices
-df_subset_ids = pd.read_csv("data/" + data_name + "/data_subsets.csv")
-train_indices = list(
-    df_subset_ids[
-        (df_subset_ids["fraction"] == fraction) & (df_subset_ids["include"] == 1)
-    ]["sample_idx"].values
-)
+df_subset_ids = pd.read_csv('../../data/'+data_name+'_data_subsets.csv')
+train_indices = list(df_subset_ids[(df_subset_ids['fraction'] == fraction) & (df_subset_ids['include'] == 1)]['sample_idx'].values)
+print(len(train_indices))
 n_samples = len(train_indices)
+
+# train-validation-test split for reproducibility
+# best provided as list [[train_indices], [validation_indices]]
 train_val_split = [
     train_indices,
     list(np.where(adata.obs["train_val_test"] == "validation")[0]),
 ]
+n_samples = len(train_val_split[0])
 
 ###
 # initialize model
@@ -57,7 +59,7 @@ model = DGD(
     modalities="feature_types",
     meta_label="cell_type",
     correction="Site",
-    save_dir="./results/trained_models/" + data_name + "/",
+    save_dir="../results/trained_models/" + data_name + "/",
     model_name=data_name
     + "_l20_h2-3_rs"
     + str(random_seed)
