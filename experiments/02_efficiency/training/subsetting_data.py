@@ -18,7 +18,7 @@ fraction_options = [0.01, 0.1, 0.25, 0.5, 0.75]
 
 # get train test split to know how many samples are in the train set
 data_name = "human_bonemarrow"
-adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
 train_indices = np.where(adata.obs["train_val_test"] == "train")[0]
 n_samples = len(train_indices)
 
@@ -43,4 +43,4 @@ for fraction in fraction_options:
         df_out = df_temp
     else:
         df_out = pd.concat([df_out, df_temp], axis=0)
-df_out.to_csv("data/" + data_name + "/data_subsets.csv", index=False)
+df_out.to_csv("../../data/" + data_name + "_data_subsets.csv", index=False)
