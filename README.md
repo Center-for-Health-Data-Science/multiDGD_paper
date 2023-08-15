@@ -10,6 +10,10 @@ If you would like to use multiDGD or scDGD, we recommend the package repositorie
 
 ***This repository is still a work in progress, as we are cleaning up the project to provide you with a well-structured pipeline for the experiments of our manuscript.***
 
+## Running experiments
+
+Instructions on the execution of our experiments can be found in [experiments](https://github.com/Center-for-Health-Data-Science/multiDGD_paper/tree/main/experiments). The experiments are numbered according to their appearance in the manuscript. The bash scripts are numbered according to the order they should be executed in. Each subfolder contains more information on the experiments and what to do.
+
 ## Download trained models and data 
 
 All models and processed datasets are available via [Figshare](https://figshare.com/articles/dataset/multiDGD_-_processed_data_and_models/23796198). They were derived from the code presented here but are made compatible with the multiDGD package.
