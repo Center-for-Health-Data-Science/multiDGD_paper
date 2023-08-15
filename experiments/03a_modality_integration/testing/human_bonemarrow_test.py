@@ -2,6 +2,7 @@
 # imports
 ##############
 
+import os
 import anndata as ad
 import pandas as pd
 import numpy as np
@@ -14,13 +15,15 @@ from omicsdgd import DGD
 ##############
 fraction_unpaired = 0
 random_seed = 0
-save_dir = "results/trained_models/"
+save_dir = "../results/trained_models/"
 data_name = "human_bonemarrow"
-adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+adata.X = adata.layers["counts"]
 train_indices = np.where(adata.obs["train_val_test"] == "train")[0]
 trainset = adata[train_indices, :].copy()
 test_indices = np.where(adata.obs["train_val_test"] == "test")[0]
 adata_test = adata[test_indices, :].copy()
+print("   loaded data")
 
 ##############
 # load model
@@ -28,11 +31,12 @@ adata_test = adata[test_indices, :].copy()
 model = DGD.load(
     data=trainset,
     save_dir=save_dir + data_name + "/",
-    model_name=data_name + "_l20_h2-3_rs" + str(random_seed),
+    model_name=data_name + "_l20_h2-3",
 )
 # change the model name so that the original test representations will not be overwritten
 model._model_name = "human_bonemarrow_l20_h2-3_rs0_unpaired0percent"
-print("   loaded")
+print("   loaded model")
+trainset = None
 
 adata_rna = adata_test[:, adata_test.var["feature_types"] == "GEX"].copy()
 adata_atac = adata_test[:, adata_test.var["feature_types"] == "ATAC"].copy()
@@ -60,8 +64,10 @@ rep_df["cell_type"] = cell_labels
 rep_df["batch"] = batch_labels
 rep_df["modality"] = modality_labels
 rep_df["cell_idx"] = cell_indices
+if not os.path.exists("../results/analysis/modality_integration/"):
+    os.makedirs("../results/analysis/modality_integration/")
 rep_df.to_csv(
-    "results/analysis/modality_integration/human_bonemarrow_l20_h2-3_rs0_unpaired0percent_testlatent.csv"
+    "../results/analysis/modality_integration/human_bonemarrow_l20_h2-3_rs0_unpaired0percent_testlatent.csv"
 )
 
 # now make a umap and export it
@@ -93,5 +99,5 @@ umap_df_test["data_set"] = umap_df_test["data_set"].replace(
 )
 # save umap
 umap_df.to_csv(
-    "results/analysis/modality_integration/human_bonemarrow_l20_h2-3_rs0_unpaired0percent_latent_integration_umap_all.csv"
+    "../results/analysis/modality_integration/human_bonemarrow_l20_h2-3_rs0_unpaired0percent_latent_integration_umap_all.csv"
 )

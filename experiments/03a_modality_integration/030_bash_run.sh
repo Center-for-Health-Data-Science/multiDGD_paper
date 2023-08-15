@@ -20,4 +20,7 @@
 # for GPU usage:
 hostname
 echo $CUDA_VISIBLE_DEVICES
-python3 ./testing/human_bonemarrow_test.py
+python ./testing/human_bonemarrow_test.py
+python ./analysis/predictions.py --fraction 0.
+python ./analysis/predictions_mvi.py
+python ./analysis/predictions_summary.py
