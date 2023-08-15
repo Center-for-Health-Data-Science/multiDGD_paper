@@ -4,16 +4,15 @@ import numpy as np
 import pandas as pd
 import anndata as ad
 
-from omicsdgd.functions._data_manipulation import load_testdata_as_anndata
-
-save_dir = "results/trained_models/"
+save_dir = "../results/trained_models/"
 data_name = "human_bonemarrow"
 
 """
 Go through datasets and chosen models and compute reconstruction performances
 """
 data_name = "human_bonemarrow"
-adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+adata.X = adata.layers["counts"]
 train_indides = np.where(adata.obs["train_val_test"] == "train")[0]
 trainset = adata[train_indides, :].copy()
 test_indides = np.where(adata.obs["train_val_test"] == "test")[0]
@@ -31,7 +30,7 @@ library = torch.cat(
     dim=1,
 )
 trainset_all = trainset.copy()
-df_subset_ids = pd.read_csv("data/" + data_name + "/data_subsets.csv")
+df_subset_ids = pd.read_csv("../../data/" + data_name + "_data_subsets.csv")
 
 subset_samples = [567, 5671, 14178, 28357, 42535, 56714]
 subset_samples.reverse()
@@ -40,7 +39,7 @@ fraction_options.reverse()
 
 for count, fraction in enumerate(fraction_options):
     print("###")
-    print(fraction)
+    print("Fraction "+str(fraction))
     print("###")
     subset = subset_samples[count]
     train_indices = list(
@@ -63,7 +62,7 @@ for count, fraction in enumerate(fraction_options):
     testset.var_names_make_unique()
     testset.obs["modality"] = "paired"
     scvi.model.MULTIVI.setup_anndata(testset, batch_key="Site")
-    print("loaded data")
+    print("   loaded data")
 
     for random_seed in [0, 37, 8790]:
         model_name = "l20_e2_d2_rs" + str(random_seed) + "_subset" + str(subset)
@@ -82,6 +81,7 @@ for count, fraction in enumerate(fraction_options):
                 save_dir + "multiVI/" + data_name + "/" + model_name, adata=trainset
             )
         elbo = model.get_elbo(testset)
+        print("   elbo: " + str(elbo.item()))
         metrics_temp = pd.DataFrame(
             {
                 "loss": [elbo.item()],
@@ -98,7 +98,7 @@ for count, fraction in enumerate(fraction_options):
             metrics_mvi = metrics_mvi.append(metrics_temp)
 
 metrics_mvi.to_csv(
-    "results/analysis/performance_evaluation/" + data_name + "_data_efficiency_mvi.csv"
+    "../results/analysis/performance_evaluation/" + data_name + "_data_efficiency_mvi.csv"
 )
 
 print("done")
