@@ -10,6 +10,13 @@ Here we predict both modalities based on paired, and single-modality data (rna a
 
 Because this section is very short, the analysis is included in the script `030_bash_run.sh`. The data frames generated in the last script (`predictions_summary.py`) give the results of Supplementary Tables 4 and 5.
 
+## Execution
+
+```
+bash 030_bash_run.sh
+bash 031_bash_plot.sh
+```
+
 ## !Note!
 
 ***This is still a work in progress, and we hope you have patience with us. We are cleaning and refactoring our code from more than half a year of work for you, so that you can run the experiments from our manuscript.***
