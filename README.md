@@ -12,7 +12,7 @@ If you would like to use multiDGD or scDGD, we recommend the package repositorie
 
 ## Download trained models and data 
 
-All models and processed datasets are available via [Figshare](https://figshare.com/articles/dataset/multiDGD_-_processed_data_and_models/23796198).
+All models and processed datasets are available via [Figshare](https://figshare.com/articles/dataset/multiDGD_-_processed_data_and_models/23796198). They were derived from the code presented here but are made compatible with the multiDGD package.
 
 Download data and models:
 ```python
