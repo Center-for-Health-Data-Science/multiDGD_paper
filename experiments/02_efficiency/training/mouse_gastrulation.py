@@ -18,9 +18,9 @@ random_seed = args.random_seed
 import anndata as ad
 import numpy as np
 
-gex = ad.read_h5ad("data/raw/anndata.h5ad")
+gex = ad.read_h5ad("../../data/raw/mouse_gastrulation_anndata.h5ad")
 modality_switch = gex.X.shape[1]
-atac = ad.read_h5ad("data/raw/PeakMatrix_anndata.h5ad")
+atac = ad.read_h5ad("../../data/raw/mouse_gastrulation_PeakMatrix_anndata.h5ad")
 ids_shared = list(
     set(gex.obs["sample"].index.values).intersection(
         set(atac.obs["sample"].index.values)
@@ -31,9 +31,11 @@ ids_atac = np.where(atac.obs["sample"].index.isin(ids_shared))[0]
 gex = gex[ids_gex]
 atac = atac[ids_atac]
 threshold = 0.00
+mudata_original = md.read("../../data/mouse_gastrulation.h5mu", backed=False)
+mudata_obs = mudata_original.obs.copy()
+mudata_original = None
 mudata = md.MuData({"rna": gex, "atac": atac})
-mudata.obs["stage"] = mudata["atac"].obs["stage"]  # .values
-mudata.obs["celltype"] = mudata["rna"].obs["celltype"]  # .values
+mudata.obs = mudata_obs
 train_val_split = [
     list(np.where(mudata.obs["train_val_test"] == "train")[0]),
     list(np.where(mudata.obs["train_val_test"] == "validation")[0]),
@@ -49,7 +51,7 @@ hyperparameters = {
     "log_wandb": ["viktoriaschuster", "omicsDGD"],
 }
 dgd_name = (
-    "mouse_gast_l20_h3-3w2_rs"
+    "mouse_gast_l20_h2-2_rs"
     + str(random_seed)
     + "_scale5"
     + "_featselect"
@@ -61,7 +63,7 @@ model = DGD(
     train_validation_split=train_val_split,
     meta_label="celltype",
     correction="stage",
-    save_dir="./results/trained_models/mouse_gastrulation/",
+    save_dir="../results/trained_models/mouse_gastrulation/",
     model_name=dgd_name,
     random_seed=random_seed,
 )
@@ -76,23 +78,22 @@ print("   model saved")
 ###
 # predict for test set
 ###
-testset = mudata[mudata.obs["train_val_test"] == "test"].copy()
+testset = mudata[mudata.obs["train_val_test"] == "test"].copy()[::100, :]
 mudata = None
 model.predict_new(testset)
 print("   test set inferred")
 
-test_gex = np.array(testset.X[:, :modality_switch].todense())
 test_recon = model.decoder_forward(model.test_rep.z.shape[0])
 test_recon_gex = test_recon[0].cpu().detach().numpy()
 test_recon_atac = test_recon[1].cpu().detach().numpy()
 np.save(
-    "results/analysis/performance_evaluation/reconstruction/"
+    "../results/analysis/performance_evaluation/reconstruction/"
     + dgd_name
     + "_test_recon_gex.npy",
     test_recon_gex,
 )
 np.save(
-    "results/analysis/performance_evaluation/reconstruction/"
+    "../results/analysis/performance_evaluation/reconstruction/"
     + dgd_name
     + "_test_recon_atac.npy",
     test_recon_atac,

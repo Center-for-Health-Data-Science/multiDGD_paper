@@ -14,7 +14,7 @@ import scipy
 random_seed = 0
 scvi.settings.seed = random_seed
 
-save_dir = "results/trained_models/multiVI/mouse_gastrulation/"
+save_dir = "../results/trained_models/multiVI/mouse_gastrulation/"
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
@@ -22,8 +22,8 @@ if not os.path.exists(save_dir):
 import anndata as ad
 import numpy as np
 
-gex = ad.read_h5ad("data/raw/anndata.h5ad")
-atac = ad.read_h5ad("data/raw/PeakMatrix_anndata.h5ad")
+gex = ad.read_h5ad("../../data/raw/mouse_gastrulation_anndata.h5ad")
+atac = ad.read_h5ad("../../data/raw/mouse_gastrulation_PeakMatrix_anndata.h5ad")
 ids_shared = list(
     set(gex.obs["sample"].index.values).intersection(
         set(atac.obs["sample"].index.values)
@@ -58,15 +58,18 @@ if threshold > 0.000:
 else:
     mudata = md.MuData({"rna": gex, "atac": atac})
 
-# mudata = md.read('data/mouse_gastrulation/mudata.h5mu', backed=False)
+mudata_original = md.read('../../data/mouse_gastrulation.h5mu', backed=False)
+mudata.obs = mudata_original.obs.copy()
+mudata_original = None
 modality_switch = mudata["rna"].X.shape[1]
 adata = ad.AnnData(scipy.sparse.hstack((mudata["rna"].X, mudata["atac"].X)))
-adata.obs["celltype"] = mudata["rna"].obs["celltype"]
-adata.obs["stage"] = mudata["atac"].obs["stage"].values
+#adata.obs["celltype"] = mudata.obs["celltype"]
+#adata.obs["stage"] = mudata.obs["stage"].values
+adata.obs = mudata.obs.copy()
 adata.var["feature_type"] = "ATAC"
 adata.var["feature_type"][:modality_switch] = "GEX"
 mudata = None
-train_indices = np.where(mudata.obs["train_val_test"] == "train")[0]
+train_indices = np.where(adata.obs["train_val_test"] == "train")[0]
 adata = adata[train_indices]
 adata.var_names_make_unique()
 adata.obs["modality"] = "paired"
@@ -86,9 +89,12 @@ mvi = scvi.model.MULTIVI(
 mvi.view_anndata_setup()
 
 import time
+import torch
 
 start = time.time()
-mvi.train(use_gpu=True)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device_index = device.index
+mvi.train(use_gpu=device_index)
 end = time.time()
 print("   time: ", end - start)
 print("   trained")

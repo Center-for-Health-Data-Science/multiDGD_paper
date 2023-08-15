@@ -21,6 +21,6 @@
 hostname
 echo $CUDA_VISIBLE_DEVICES
 # DGD
-python3 ./training/mouse_gastrulation.py --random_seed 0
+python ./training/mouse_gastrulation.py --random_seed 0
 # mvi
-python3 ./training/mvi_mouse_gastrulation.py
+python ./training/mvi_mouse_gastrulation.py
