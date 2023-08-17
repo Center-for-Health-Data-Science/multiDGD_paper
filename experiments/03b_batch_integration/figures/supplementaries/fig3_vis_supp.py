@@ -11,13 +11,13 @@ import os
 from omicsdgd import DGD
 import umap.umap_ as umap
 import matplotlib.transforms as mtransforms
-from omicsdgd.functions._data_manipulation import load_testdata_as_anndata
 from omicsdgd.functions._analysis import discrete_kullback_leibler
 
 #####################
 # define model names, directory and batches
 #####################
-save_dir = "results/trained_models/"
+save_dir = "../results/trained_models/"
+analysis_dir = "../results/analysis/"
 data_name = "human_bonemarrow"
 model_names = [
     "human_bonemarrow_l20_h2-3_leftout_site1",
@@ -80,7 +80,7 @@ trans = mtransforms.ScaledTranslation(-20 / 72, 7 / 72, fig.dpi_scale_trans)
 #####################
 def return_error_ratios(df_c, model_prefix, site, model_name):
     """returns error ratios for the batches that had been left out of training"""
-    df_site = pd.read_csv("results/analysis/batch_integration/" + model_prefix + "_" + site + "_prediction_errors.csv")
+    df_site = pd.read_csv(analysis_dir+"batch_integration/" + model_prefix + "_" + site + "_prediction_errors.csv")
     df_site = df_site[df_site["batch_id"] == site]
     error_ratios = [
         (
@@ -103,7 +103,7 @@ def return_error_ratios(df_c, model_prefix, site, model_name):
 
 def return_inverse_error_ratios(df_c, model_prefix, site, model_name):
     """returns error ratios for all batches included in training"""
-    df_site = pd.read_csv("results/analysis/batch_integration/" + model_prefix + "_" + site + "_prediction_errors.csv")
+    df_site = pd.read_csv(analysis_dir+"batch_integration/" + model_prefix + "_" + site + "_prediction_errors.csv")
     df_site = df_site[df_site["batch_id"] != site]
     error_ratios = [
         (
@@ -154,7 +154,7 @@ def get_metric(df, df_new, metric):
         out.append(mean_val)
     return out
 
-df_control = pd.read_csv("results/analysis/batch_integration/human_bonemarrow_none_prediction_errors.csv")
+df_control = pd.read_csv(analysis_dir+"batch_integration/human_bonemarrow_none_prediction_errors.csv")
 for i, site in enumerate(["site1", "site2", "site3", "site4"]):
     # first for unseen batches
     df_error_ratios_temp = return_error_ratios(df_control, "human_bonemarrow", site, "multiDGD")
@@ -187,7 +187,7 @@ dkl_dgd = np.asarray(
 )
 dkl_dgd = dkl_dgd.mean()
 # calculate for mVI+scArches
-df_control = pd.read_csv("results/analysis/batch_integration/mvi_human_bonemarrow_none_prediction_errors.csv")
+df_control = pd.read_csv(analysis_dir+"batch_integration/mvi_human_bonemarrow_none_prediction_errors.csv")
 for i, site in enumerate(["site1", "site2", "site3", "site4"]):
     df_error_ratios_temp = return_error_ratios(df_control, "mvi_human_bonemarrow", site, "multiVI+scArches")
     df_error_ratios_temp["DKL"] = discrete_kullback_leibler(
@@ -217,11 +217,11 @@ df_error_ratios["prediction type"] = df_error_ratios["prediction type"].astype("
 df_error_ratios["prediction type"].cat.set_categories(["seen", "unseen"], inplace=True)
 
 # get all the performance metrics and batch effect metrics
-metrics_df = pd.read_csv("results/analysis/batch_integration/human_bonemarrow_reconstruction_performance.csv")
-df_batch_effect = pd.read_csv("results/analysis/batch_integration/human_bonemarrow_batch_effect.csv")
+metrics_df = pd.read_csv(analysis_dir+"batch_integration/human_bonemarrow_reconstruction_performance.csv")
+df_batch_effect = pd.read_csv(analysis_dir+"batch_integration/human_bonemarrow_batch_effect.csv")
 df_batch_effect["1 - ASW"] = 1 - df_batch_effect["ASW"]
 df_batch_effect["(1 - ASW) ratio"] = df_batch_effect["1 - ASW"] / df_batch_effect["1 - ASW"].values[0]
-df_batch_effect_2 = pd.read_csv("results/analysis/batch_integration/human_bonemarrow_batch_effect_mvi.csv")
+df_batch_effect_2 = pd.read_csv(analysis_dir+"batch_integration/human_bonemarrow_batch_effect_mvi.csv")
 df_batch_effect_2["1 - ASW"] = 1 - df_batch_effect_2["ASW"]
 df_batch_effect_2["(1 - ASW) ratio"] = df_batch_effect_2["1 - ASW"] / df_batch_effect_2["1 - ASW"].values[0]
 df_batch_effect = pd.concat([df_batch_effect, df_batch_effect_2], axis=0)
@@ -248,9 +248,20 @@ df_batch_effect["model"].cat.set_categories(["multiVI\n+scArches", "multiDGD"], 
 # prepare umaps
 ###
 column_names = ["UMAP D1", "UMAP D2"]
-if not os.path.exists("results/analysis/batch_integration/bonemarrow_umap_batches.csv"):
-    is_train_df = pd.read_csv("data/" + data_name + "/train_val_test_split.csv")
-    trainset, testset, modality_switch, library = load_testdata_as_anndata(data_name)
+if not os.path.exists(analysis_dir+"batch_integration/bonemarrow_umap_batches.csv"):
+    #is_train_df = pd.read_csv("data/" + data_name + "/train_val_test_split.csv")
+    #trainset, testset, modality_switch, library = load_testdata_as_anndata(data_name)
+
+    import anndata as ad
+
+    data_name = "human_bonemarrow"
+    adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+    adata.X = adata.layers["counts"]
+    train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
+    test_indices = list(np.where(adata.obs["train_val_test"] == "test")[0])
+    trainset = adata[train_indices, :].copy()
+    testset = adata[test_indices, :].copy()
+
     batch_labels = testset.obs["Site"].values
     for count, model_name in enumerate(model_names):
         print(model_name)
@@ -290,18 +301,29 @@ if not os.path.exists("results/analysis/batch_integration/bonemarrow_umap_batche
         else:
             umap_data = pd.concat([umap_data, plot_data], axis=0)
         # save files
-    umap_data.to_csv("results/analysis/batch_integration/bonemarrow_umap_batches.csv", index=False)
+    umap_data.to_csv(analysis_dir+"batch_integration/bonemarrow_umap_batches.csv", index=False)
 else:
-    umap_data = pd.read_csv("results/analysis/batch_integration/bonemarrow_umap_batches.csv")
+    umap_data = pd.read_csv(analysis_dir+"batch_integration/bonemarrow_umap_batches.csv")
     umap_data["batch"] = umap_data["batch"].astype("category")
     umap_data["batch"].cat.set_categories(["train", "test seen", "site1", "site2", "site3", "site4"], inplace=True)
     umap_data["data set"] = umap_data["batch"].astype("category")
     umap_data["data set"].cat.set_categories(["train", "test"], inplace=True)
 # MVI
-if not os.path.exists("results/analysis/batch_integration/mvi_bonemarrow_umap_batches.csv"):
+if not os.path.exists(analysis_dir+"batch_integration/mvi_bonemarrow_umap_batches.csv"):
     import scvi
-    is_train_df = pd.read_csv("data/" + data_name + "/train_val_test_split.csv")
-    trainset, testset, modality_switch, library = load_testdata_as_anndata(data_name)
+    #is_train_df = pd.read_csv("data/" + data_name + "/train_val_test_split.csv")
+    #trainset, testset, modality_switch, library = load_testdata_as_anndata(data_name)
+
+    import anndata as ad
+
+    data_name = "human_bonemarrow"
+    adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+    adata.X = adata.layers["counts"]
+    train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
+    test_indices = list(np.where(adata.obs["train_val_test"] == "test")[0])
+    trainset = adata[train_indices, :].copy()
+    testset = adata[test_indices, :].copy()
+
     batch_labels = testset.obs["Site"].values
     trainset.obs['modality'] = 'paired'
     trainset.X = trainset.layers['counts']
@@ -348,9 +370,9 @@ if not os.path.exists("results/analysis/batch_integration/mvi_bonemarrow_umap_ba
         else:
             umap_data_2 = pd.concat([umap_data_2, plot_data], axis=0)
         # save files
-    umap_data_2.to_csv("results/analysis/batch_integration/mvi_bonemarrow_umap_batches.csv", index=False)
+    umap_data_2.to_csv(analysis_dir+"batch_integration/mvi_bonemarrow_umap_batches.csv", index=False)
 else:
-    umap_data_2 = pd.read_csv("results/analysis/batch_integration/mvi_bonemarrow_umap_batches.csv")
+    umap_data_2 = pd.read_csv(analysis_dir+"batch_integration/mvi_bonemarrow_umap_batches.csv")
     umap_data_2["batch"] = umap_data_2["batch"].astype("category")
     umap_data_2["batch"].cat.set_categories(["train", "test seen", "site1", "site2", "site3", "site4"], inplace=True)
     umap_data_2["data set"] = umap_data_2["batch"].astype("category")
@@ -434,4 +456,4 @@ for i, site in enumerate(batches_left_out):
     ax_list[-1].set_xticklabels([])
     ax_list[-1].set_yticklabels([])
 
-plt.savefig("results/analysis/plots/batch_integration/fig3_vis_supp.png", dpi=720, bbox_inches="tight")
+plt.savefig(analysis_dir+"plots/supplementaries/fig3_vis_supp.png", dpi=720, bbox_inches="tight")

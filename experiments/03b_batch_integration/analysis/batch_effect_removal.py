@@ -4,6 +4,7 @@ of leaving a batch out of training
 """
 
 # imports
+import os
 import pandas as pd
 import numpy as np
 import scvi
@@ -15,9 +16,10 @@ from sklearn.metrics import silhouette_score
 # collect test errors per model and sample
 ####################
 # load data
-save_dir = "results/trained_models/"
+save_dir = "../results/trained_models/"
 data_name = "human_bonemarrow"
-adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+adata.X = adata.layers["counts"]
 train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
 test_indices = list(np.where(adata.obs["train_val_test"] == "test")[0])
 trainset = adata[train_indices, :].copy()
@@ -68,13 +70,16 @@ for i, model_name in enumerate(model_names):
     model = None
     test_predictions = None
     test_errors = None
-# df.to_csv('results/analysis/batch_integration/'+data_name+'_'+batches_left_out[i]+'_batch_effect.csv')
-df.to_csv("results/analysis/batch_integration/" + data_name + "_batch_effect.csv")
+
+if not os.path.exists("../results/analysis/batch_integration"):
+    os.makedirs("../results/analysis/batch_integration")
+df.to_csv("../results/analysis/batch_integration/" + data_name + "_batch_effect.csv")
+print("saved dgd batch effects")
 
 
 # now multiVI
 print("doing multiVI now")
-model_dir = "results/trained_models/multiVI/" + data_name + "/"
+model_dir = "../results/trained_models/multiVI/" + data_name + "/"
 model_names = [
     "l20_e2_d2",
     "l20_e2_d2_leftout_site1_scarches",
@@ -108,5 +113,6 @@ for i, model_name in enumerate(model_names):
     model = None
     test_predictions = None
     test_errors = None
-# df.to_csv('results/analysis/batch_integration/'+data_name+'_'+batches_left_out[i]+'_batch_effect_mvi.csv')
-df.to_csv("results/analysis/batch_integration/" + data_name + "_batch_effect_mvi.csv")
+
+df.to_csv("../results/analysis/batch_integration/" + data_name + "_batch_effect_mvi.csv")
+print("saved mvi batch effects")

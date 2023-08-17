@@ -14,9 +14,10 @@ from omicsdgd import DGD
 # collect test errors per model and sample
 ####################
 # load data
-save_dir = "results/trained_models/"
+save_dir = "../results/trained_models/"
 data_name = "human_bonemarrow"
-adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+adata.X = adata.layers["counts"]
 train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
 test_indices = list(np.where(adata.obs["train_val_test"] == "test")[0])
 trainset = adata[train_indices, :].copy()
@@ -33,7 +34,7 @@ model_names = [
     "human_bonemarrow_l20_h2-3_leftout_site4",
 ]
 for i, model_name in enumerate(model_names):
-    print(batches_left_out[i])
+    print("batch left out:",batches_left_out[i])
     if batches_left_out[i] != "none":
         train_indices = [
             x
@@ -52,12 +53,12 @@ for i, model_name in enumerate(model_names):
     model.init_test_set(testset)
 
     # get test predictions
-    print("predicting test samples")
+    print("   predicting test samples")
     test_predictions = model.predict_from_representation(
         model.test_rep, model.correction_test_rep
     )
     # get test errors
-    print("computing test errors")
+    print("   computing test errors")
     test_errors = model.get_prediction_errors(
         test_predictions, model.test_set, reduction="sample"
     )
@@ -70,7 +71,7 @@ for i, model_name in enumerate(model_names):
     # - batch id of sample
     # - error of sample
     # - model id (in terms of batch left out)
-    print("collecting results")
+    print("   collecting results")
     temp_df = pd.DataFrame(
         {
             "sample_id": testset.obs.index,
@@ -79,15 +80,9 @@ for i, model_name in enumerate(model_names):
             "model_id": batches_left_out[i],
         }
     )
-    # if i == 0:
-    #    df = temp_df
-    # else:
-    #    temp_df = temp_df[temp_df['batch_id'] == batches_left_out[i]]
-    #    print(temp_df)
-    #    df = df.append(temp_df)
 
     temp_df.to_csv(
-        "results/analysis/batch_integration/"
+        "../results/analysis/batch_integration/"
         + data_name
         + "_"
         + batches_left_out[i]
@@ -96,3 +91,4 @@ for i, model_name in enumerate(model_names):
     model = None
     test_predictions = None
     test_errors = None
+print("saved dgd prediction errors")
