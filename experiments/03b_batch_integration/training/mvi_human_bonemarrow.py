@@ -20,8 +20,14 @@ args = parser.parse_args()
 batch_left_out = args.batch_left_out
 random_seed = args.random_seed
 scvi.settings.seed = random_seed
+print(
+    "training MultiVI on human bonemarrow data with random seed ",
+    random_seed,
+    " and batch left out: ",
+    batch_left_out,
+)
 
-save_dir = "results/trained_models/multiVI/human_pbmc/"
+save_dir = "../results/trained_models/multiVI/human_bonemarrow/"
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
@@ -29,7 +35,8 @@ if not os.path.exists(save_dir):
 # load data
 ###
 data_name = "human_bonemarrow"
-adata = ad.read_h5ad("data/" + data_name + ".h5ad")
+adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
+adata.X = adata.layers["counts"]
 batches = adata.obs["Site"].unique()
 train_indices_all = list(np.where(adata.obs["train_val_test"] == "train")[0])
 train_indices = [
