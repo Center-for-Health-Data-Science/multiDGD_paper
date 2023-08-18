@@ -637,7 +637,6 @@ class DGD(nn.Module):
             self.test_set, batch_size=8,
             shuffle=True, num_workers=0
             )
-        print(test_loader.dataset.data[0,:20])
         
         # init new representation
         #self.test_rep = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],

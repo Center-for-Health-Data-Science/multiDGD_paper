@@ -79,7 +79,7 @@ def init_model_from_name(data, name, meta, corr, d_name, model=None):
 
 # create a diverse enough color palette given the data
 def make_palette_from_meta(name):
-    meta = pd.read_csv('data/'+name+'/plotting_metadata.csv',sep=';')
+    meta = pd.read_csv('../../data/'+name+'_plotting_metadata.csv',sep=';')
     meta = meta.sort_values('lineage')
     classes_neworder = list(meta['cell_type'].values)
     n_classes = len(classes_neworder)

@@ -73,6 +73,7 @@ def learn_new_representations(
     #    print("WARNING: there are unknown distributions in the data\nWill learn extra components in the GMM")
     #    print(gmm.n_mix_comp, len(data_loader.dataset.meta.unique())) # apparently site1 had ha whole cell type
     correction_hook = False
+    """
     if correction_model is not None:
         if correction_model.n_mix_comp < data_loader.dataset.correction_classes:
             print("WARNING: there are unknown distributions in the data\nWill learn extra components in the batch GMM")
@@ -84,6 +85,7 @@ def learn_new_representations(
                 indices_of_new_distribution,
                 other_gmm=gmm)
             correction_hook = True
+    """
 
     # make temporary representations with samples from each component per data point
     if correction_model is not None:
@@ -98,8 +100,8 @@ def learn_new_representations(
             [gmm.sample_new_points(resampling_type, resampling_samples)]
         )
 
-    print("making potential reps")
-    print("   all potential reps: ", potential_reps.shape)
+    #print("making potential reps")
+    #print("   all potential reps: ", potential_reps.shape)
 
     decoder.eval()
 
@@ -133,6 +135,7 @@ def learn_new_representations(
         device
     )
     newrep_optimizer = torch.optim.Adam(new_rep.parameters(), lr=lrs[0], weight_decay=1e-4, betas=(0.5, 0.7))
+    test_correction_rep = None
     if correction_model is not None:
         test_correction_rep = RepresentationLayer(
             n_rep=2, n_sample=n_samples_new, value_init=rep_init_values[:, gmm.dim :]
