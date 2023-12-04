@@ -16,9 +16,6 @@ from omicsdgd.nn import Decoder
 from omicsdgd.functions import train_dgd, set_random_seed, count_parameters, sc_feature_selection, learn_new_representations
 from omicsdgd.functions._gene_to_peak_linkage import predict_perturbations
 
-# define device (gpu or cpu)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 '''Central Module of the package'''
 
 class DGD(nn.Module):
@@ -79,15 +76,24 @@ class DGD(nn.Module):
             save_dir='./',
             random_seed = 0,
             model_name='dgd',
-            print_outputs=True
+            print_outputs=True,
+            num_workers=None
         ):
         super().__init__()
+
+        print("CUDA Available:", torch.cuda.is_available())
+        print("Number of GPUs:", torch.cuda.device_count())
+        if torch.cuda.is_available():
+            print("GPU Name:", torch.cuda.get_device_name(0))
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print("using device: ", self.device)
 
         # setting the random seed at the beginning for reproducibility
         set_random_seed(random_seed)
 
         # setting internal helper attributes
-        self._init_internal_attribs(model_name, save_dir, scaling, meta_label, correction, print_outputs) # needs to go? meta_label to data, dev_mode to train
+        self._init_internal_attribs(model_name, save_dir, scaling, meta_label, correction, print_outputs, num_workers) # needs to go? meta_label to data, dev_mode to train
         #self.trained_status = nn.Parameter(torch.zeros(1, dtype=torch.bool), requires_grad=False)
 
         # if there is a train-val(-test) split, check that it is in accepted format
@@ -125,7 +131,7 @@ class DGD(nn.Module):
         self._init_decoder()
         #self._get_train_status()
     
-    def _init_internal_attribs(self, model_name, save_dir, scaling, meta_label, correction, print_outputs):
+    def _init_internal_attribs(self, model_name, save_dir, scaling, meta_label, correction, print_outputs, num_workers):
         # define what to name the model and where to save it
         self._model_name = model_name
         self._save_dir = save_dir
@@ -139,6 +145,13 @@ class DGD(nn.Module):
         # important for checking whether a model is trained or has loaded learned parameters
         self.trained_status = nn.Parameter(torch.zeros(1, dtype=torch.bool), requires_grad=False)
         self._print_output = print_outputs
+        if num_workers is None:
+            if self.device != 'cpu':
+                self._num_workers = 4
+            else:
+                self._num_workers = 0
+        else:
+            self._num_workers = num_workers
     
     def _check_train_split(self, split):
         '''
@@ -306,7 +319,7 @@ class DGD(nn.Module):
             dim=self.param_dict['latent_dimension'],
             mean_init=(self.param_dict['softball_scale'],self.param_dict['softball_hardness']),
             sd_init=(self.param_dict['sd_mean'],self.param_dict['sd_sd']),
-            weight_alpha=self.param_dict['dirichlet_a']).to(device)
+            weight_alpha=self.param_dict['dirichlet_a']).to(self.device)
         if self._print_output:
             print(self.gmm)
     
@@ -315,14 +328,14 @@ class DGD(nn.Module):
         # initialize representation(s)
         self.representation = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
             n_sample=self.train_set.n_sample,
-            value_init=self.param_dict['value_init']).to(device)
+            value_init=self.param_dict['value_init']).to(self.device)
         if self._print_output:
             print(self.representation)
         self.validation_rep = None
         if self.val_set is not None:
             self.validation_rep = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
                 n_sample=self.val_set.n_sample,
-                value_init=self.param_dict['value_init']).to(device)
+                value_init=self.param_dict['value_init']).to(self.device)
         self.test_rep = None
     
     # as a list, the correction models were not saved in the state_dict
@@ -343,16 +356,16 @@ class DGD(nn.Module):
                         GaussianMixtureSupervised(Nclass=n_correction_classes,Ncompperclass=1,dim=2,
                             mean_init=(self.param_dict['softball_scale'],self.param_dict['softball_hardness']),
                             sd_init=(round((2*self.param_dict['softball_scale'])/(10*n_correction_classes),2),self.param_dict['sd_sd']),
-                            alpha=2).to(device)
+                            alpha=2).to(self.device)
                         )
                     inner_list.append(
                         RepresentationLayer(n_rep=inner_list[0].dim,n_sample=self.train_set.n_sample,
-                            value_init=inner_list[0].supervised_sampling(self.train_set.get_correction_labels(corr_id),sample_type='origin')).to(device)
+                            value_init=inner_list[0].supervised_sampling(self.train_set.get_correction_labels(corr_id),sample_type='origin')).to(self.device)
                         )
                     if self.validation_rep is not None:
                         inner_list.append(
                             RepresentationLayer(n_rep=inner_list[0].dim,n_sample=self.val_set.n_sample,
-                                value_init=inner_list[0].supervised_sampling(self.val_set.get_correction_labels(corr_id),sample_type='origin')).to(device)
+                                value_init=inner_list[0].supervised_sampling(self.val_set.get_correction_labels(corr_id),sample_type='origin')).to(self.device)
                             )
                     self.correction_models.append(inner_list)
             else:
@@ -371,15 +384,15 @@ class DGD(nn.Module):
                     Nclass=n_correction_classes,Ncompperclass=1,dim=dim,
                     mean_init=(self.param_dict['softball_scale_corr'],self.param_dict['softball_hardness_corr']),
                     sd_init=(round((2*self.param_dict['softball_scale_corr'])/(10*n_correction_classes),2),
-                    self.param_dict['sd_sd_corr']),alpha=2).to(device)
+                    self.param_dict['sd_sd_corr']),alpha=2).to(self.device)
             self.correction_rep = RepresentationLayer(
                     n_rep=dim,n_sample=self.train_set.n_sample,
                     value_init=self.correction_gmm.supervised_sampling(self.train_set.get_correction_labels(),
-                    sample_type='origin')).to(device)
+                    sample_type='origin')).to(self.device)
             if self.validation_rep is not None:
                 self.correction_val_rep = RepresentationLayer(
                         n_rep=dim,n_sample=self.val_set.n_sample,
-                        value_init='zero').to(device)
+                        value_init='zero').to(self.device)
             print(self.correction_gmm)
         else:
             self.correction_gmm = None
@@ -392,7 +405,7 @@ class DGD(nn.Module):
             updated_latent_dim = self.param_dict['latent_dimension']+self.correction_gmm.dim
         else:
             updated_latent_dim = self.param_dict['latent_dimension']
-        self.decoder = Decoder(in_features=updated_latent_dim,parameter_dictionary=self.param_dict).to(device)
+        self.decoder = Decoder(in_features=updated_latent_dim,parameter_dictionary=self.param_dict).to(self.device)
         #if self._developer_mode:
         #    wandb.run.summary["N_parameters"] = count_parameters(self.decoder)
         self.param_dict['n_decoder_parameters'] = count_parameters(self.decoder)
@@ -425,18 +438,20 @@ class DGD(nn.Module):
         
         # prepare data loaders
         # first step is to transform the data into tensors
+        # set the number of workers if you are not using a notebook or if gpu is not available
         print('Preparing data loaders')
+        print('   num_workers: ',self._num_workers)
         self.train_set.data_to_tensor()
         train_loader = torch.utils.data.DataLoader(
             self.train_set, batch_size=self.param_dict['batch_size'],
-            shuffle=True, num_workers=0
+            shuffle=True, num_workers=self._num_workers
             )
         validation_loader = None
         if self.validation_rep is not None:
             self.val_set.data_to_tensor()
             validation_loader = torch.utils.data.DataLoader(
                 self.val_set, batch_size=self.param_dict['batch_size'],
-                shuffle=True, num_workers=0
+                shuffle=True, num_workers=self._num_workers
                 )
         
         print('Now training')
@@ -447,6 +462,7 @@ class DGD(nn.Module):
             learning_rates=self.param_dict['learning_rates'],
             adam_betas=self.param_dict['betas'],wd=self.param_dict['weight_decay'],
             stop_method=stop_with,stop_len=stop_after,train_minimum=train_minimum,
+            device=self.device,
             save_dir=self._save_dir,
             developer_mode=developer_mode
             )
@@ -475,33 +491,33 @@ class DGD(nn.Module):
             print('data(split) is not the same as provided for training. Correcting representation size.')
             self.representation = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
                 n_sample=checkpoint['representation.z'].shape[0],
-                value_init=self.param_dict['value_init']).to(device)
+                value_init=self.param_dict['value_init']).to(self.device)
         if 'validation_rep.z' in list(checkpoint.keys()):
             if self.validation_rep is None:
                 self.validation_rep = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
                     n_sample=checkpoint['validation_rep.z'].shape[0],
-                    value_init=self.param_dict['value_init']).to(device)
+                    value_init=self.param_dict['value_init']).to(self.device)
             elif self.validation_rep.z.shape != checkpoint['validation_rep.z'].shape:
                 self.validation_rep = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
                     n_sample=checkpoint['validation_rep.z'].shape[0],
-                    value_init=self.param_dict['value_init']).to(device)
+                    value_init=self.param_dict['value_init']).to(self.device)
             if self.correction_gmm is not None:
                 #if self.correction_val_rep is not None:
                 if (not hasattr(self, 'correction_val_rep')) and (self.validation_rep is not None):
                     self.correction_val_rep = RepresentationLayer(n_rep=self.correction_gmm.dim,
                         n_sample=checkpoint['validation_rep.z'].shape[0],
-                        value_init=self.param_dict['value_init']).to(device)
+                        value_init=self.param_dict['value_init']).to(self.device)
             #else:
             #    print('careful! no validation representation has been initialized')
         if 'test_rep.z' in list(checkpoint.keys()):
             self.test_rep = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
                 n_sample=checkpoint['test_rep.z'].shape[0],
-                value_init=self.param_dict['value_init']).to(device)
+                value_init=self.param_dict['value_init']).to(self.device)
             if self.correction_gmm is not None:
                 self.correction_test_rep = RepresentationLayer(
                             n_rep=self.correction_gmm.dim,
                             n_sample=self.test_rep.z.shape[0],
-                            value_init='zero').to(device)
+                            value_init='zero').to(self.device)
                 #if 'new_correction_model' in list(checkpoint.keys()):
         
         # dirty hack because I switched naming for one model and dataset
@@ -575,21 +591,21 @@ class DGD(nn.Module):
             print('data(split) is not the same as provided for training. Correcting representation size.')
             model.representation = RepresentationLayer(n_rep=model.param_dict['latent_dimension'],
                 n_sample=checkpoint['representation.z'].shape[0],
-                value_init=model.param_dict['value_init']).to(device)
+                value_init=model.param_dict['value_init']).to(self.device)
         if 'validation_rep.z' in list(checkpoint.keys()):
             if model.validation_rep is None:
                 model.validation_rep = RepresentationLayer(n_rep=model.param_dict['latent_dimension'],
                     n_sample=checkpoint['validation_rep.z'].shape[0],
-                    value_init=model.param_dict['value_init']).to(device)
+                    value_init=model.param_dict['value_init']).to(self.device)
             else:
                 if model.validation_rep.z.shape != checkpoint['validation_rep.z'].shape:
                     model.validation_rep = RepresentationLayer(n_rep=model.param_dict['latent_dimension'],
                         n_sample=checkpoint['validation_rep.z'].shape[0],
-                        value_init=model.param_dict['value_init']).to(device)
+                        value_init=model.param_dict['value_init']).to(self.device)
         if 'test_rep.z' in list(checkpoint.keys()):
             model.test_rep = RepresentationLayer(n_rep=model.param_dict['latent_dimension'],
                 n_sample=checkpoint['test_rep.z'].shape[0],
-                value_init=model.param_dict['value_init']).to(device)
+                value_init=model.param_dict['value_init']).to(self.device)
         
         model.load_state_dict(checkpoint)
         '''
@@ -621,7 +637,7 @@ class DGD(nn.Module):
             self.param_dict['modalities'])
         self.test_set.data_to_tensor()
     
-    def predict_new(self, testdata, n_epochs=10, include_correction_error=True, indices_of_new_distribution=None):
+    def predict_new(self, testdata, n_epochs=10, include_correction_error=True, indices_of_new_distribution=None, start_from_zero=[False,False]):
         '''learn the embedding for new datapoints'''
 
         # prepare test set and loader
@@ -641,7 +657,7 @@ class DGD(nn.Module):
         # init new representation
         #self.test_rep = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
         #    n_sample=self.test_set.n_sample,
-        #    value_init=self.param_dict['value_init']).to(device)
+        #    value_init=self.param_dict['value_init']).to(self.device)
         
         # train that representation
         self.test_rep, self.correction_test_rep, new_correction_model = learn_new_representations(
@@ -652,7 +668,8 @@ class DGD(nn.Module):
                 self.correction_gmm,
                 n_epochs=n_epochs,
                 include_correction_error=include_correction_error,
-                indices_of_new_distribution=indices_of_new_distribution)
+                indices_of_new_distribution=indices_of_new_distribution,
+                start_from_zero=start_from_zero)
         self.param_dict['test_representation'] = True
         # make the new_correction_model an attribute so it is learned
         self.save()

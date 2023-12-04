@@ -50,7 +50,8 @@ def learn_new_representations(
     resampling_type="mean",
     resampling_samples=1,
     include_correction_error=True,
-    indices_of_new_distribution=None
+    indices_of_new_distribution=None,
+    start_from_zero=[False,False]
 ):
     """
     this function creates samples from the trained GMM for each new point,
@@ -89,12 +90,17 @@ def learn_new_representations(
 
     # make temporary representations with samples from each component per data point
     if correction_model is not None:
-        potential_reps = prepare_potential_reps(
-            [
-                gmm.sample_new_points(resampling_type, resampling_samples),
-                correction_model.sample_new_points(resampling_type, resampling_samples),
-            ]
-        )
+        if not start_from_zero[1]:
+            potential_reps = prepare_potential_reps(
+                [
+                    gmm.sample_new_points(resampling_type, resampling_samples),
+                    correction_model.sample_new_points(resampling_type, resampling_samples),
+                ]
+            )
+        else:
+            potential_reps = prepare_potential_reps(
+                [gmm.sample_new_points(resampling_type, resampling_samples), torch.zeros((resampling_samples, correction_model.dim))]
+            )
     else:
         potential_reps = prepare_potential_reps(
             [gmm.sample_new_points(resampling_type, resampling_samples)]
@@ -137,16 +143,29 @@ def learn_new_representations(
     newrep_optimizer = torch.optim.Adam(new_rep.parameters(), lr=lrs[0], weight_decay=1e-4, betas=(0.5, 0.7))
     test_correction_rep = None
     if correction_model is not None:
-        test_correction_rep = RepresentationLayer(
-            n_rep=2, n_sample=n_samples_new, value_init=rep_init_values[:, gmm.dim :]
-        ).to(device)
-        correction_rep_optim = torch.optim.Adam(
-            test_correction_rep.parameters(), lr=lrs[1], weight_decay=1e-4, betas=(0.5, 0.7)
-        )
-        if correction_hook:
-            correction_model_optim = torch.optim.Adam(
-            correction_model.parameters(), lr=lrs[0], weight_decay=0, betas=(0.5, 0.7)
-        )
+        if not start_from_zero[1]:
+            test_correction_rep = RepresentationLayer(
+                n_rep=2, n_sample=n_samples_new, value_init=rep_init_values[:, gmm.dim :]
+            ).to(device)
+            correction_rep_optim = torch.optim.Adam(
+                test_correction_rep.parameters(), lr=lrs[1], weight_decay=1e-4, betas=(0.5, 0.7)
+            )
+            if correction_hook:
+                correction_model_optim = torch.optim.Adam(
+                correction_model.parameters(), lr=lrs[0], weight_decay=0, betas=(0.5, 0.7)
+                )
+        else:
+            test_correction_rep = RepresentationLayer(
+                n_rep=2, n_sample=n_samples_new, value_init="zero"
+            ).to(device)
+            correction_rep_optim = torch.optim.Adam(
+                test_correction_rep.parameters(), lr=lrs[1], weight_decay=1e-4, betas=(0.5, 0.7)
+            )
+            if correction_hook:
+                correction_model_optim = torch.optim.Adam(
+                correction_model.parameters(), lr=lrs[0], weight_decay=0, betas=(0.5, 0.7)
+                )
+
     rep_init_values = None
 
     #####################

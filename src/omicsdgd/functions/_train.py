@@ -7,10 +7,6 @@ from omicsdgd.latent import RepresentationLayer
 from omicsdgd.functions._metrics import clustering_metric, rep_triangle_loss
 from sklearn.metrics import silhouette_score
 
-#import time
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 def set_random_seed(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -44,6 +40,7 @@ def train_dgd(
     stop_method,
     stop_len,
     train_minimum,
+    device,
     save_dir='./',
     developer_mode=False
     ):
@@ -51,6 +48,7 @@ def train_dgd(
     '''main train function'''
 
     print('training for ',n_epochs,' epochs with early stopping (',stop_method,')')
+    #print('The model parts are on device: ', next(decoder.parameters()).device, next(gmm.parameters()).device, next(representation.parameters()).device, next(validation_rep.parameters()).device, next(correction_gmm.parameters()).device, next(correction_rep.parameters()).device, next(correction_val_rep.parameters()).device)
 
     ###
     # prepare optimizers and correction models (if applicable, e.g. batch correction)
