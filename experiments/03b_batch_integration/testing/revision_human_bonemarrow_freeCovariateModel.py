@@ -43,36 +43,24 @@ print("   data loaded")
 ###
 # initialize model
 ###
-hyperparameters = {
-    "latent_dimension": 20,
-    "n_hidden": 2,
-    "n_hidden_modality": 3,
-    "log_wandb": ["viktoriaschuster", "omicsDGD"],
-}
 
-model = DGD(
+model = DGD.load(
     data=adata[train_indices],
-    parameter_dictionary=hyperparameters,
-    train_validation_split=train_val_split,
-    modalities="feature_types",
-    meta_label="cell_type",
-    correction="Site",
     save_dir="../results/trained_models/" + data_name + "/",
     model_name=data_name + "_l20_h2-3_leftout_" + batches[batch_left_out],
-    random_seed=random_seed,
+    random_seed=random_seed
 )
-print("   model initialized")
-
-###
-# train and save
-###
-model.train(n_epochs=1000, train_minimum=100, developer_mode=True, stop_after=50)
-model.save()
-print("   model saved")
+print("   model loaded")
 
 ###
 # predict for test set
 ###
+original_name = model._model_name
+model._model_name = original_name + "_test10e_noCovError"
 testset = adata[adata.obs["train_val_test"] == "test"].copy()
-model.predict_new(testset)
+model.predict_new(testset, include_correction_error=False)
 print("   test set inferred")
+
+model._model_name = original_name + "_test50e_noCovError"
+model.predict_new(testset, include_correction_error=False, n_epochs=50)
+print("   test set inferred (long)")
