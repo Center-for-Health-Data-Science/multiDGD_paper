@@ -20,32 +20,45 @@
 # for GPU usage:
 hostname
 echo $CUDA_VISIBLE_DEVICES
+
 ###
-# feel free to split these jobs up
+# human bonemarrow
+###
+#python ./training/revision_human_bonemarrow_75percent.py --random_seed 0
+#python ./training/revision_human_bonemarrow_75percent.py --random_seed 37
+#python ./training/revision_human_bonemarrow_75percent.py --random_seed 8790
+
+# testing supervised
+#python ./testing/revision_human_bonemarrow_supervised.py --batch_left_out 0 --random_seed 0
+#python ./testing/revision_human_bonemarrow_supervised.py --batch_left_out 1 --random_seed 0
+#python ./testing/revision_human_bonemarrow_supervised.py --batch_left_out 2 --random_seed 0
+#python ./testing/revision_human_bonemarrow_supervised.py --batch_left_out 3 --random_seed 0
+
+# analysis
+#python ./analysis/revision_human_bonemarrow_prediction_errors.py
+#python ./analysis/revision_human_bonemarrow_predictions.py
+#python ./analysis/revision_human_bonemarrow_covariate_representations.py
+
+###
+# mouse gastrulation
 ###
 
-# testing without correction model error
-# first over batches, then over random seeds
+# now train on mouse gastrulation data with a single time point left out
+#python ./training/mouse_gastrulation.py --batch_left_out 0 --random_seed 0
+#python ./training/mouse_gastrulation.py --batch_left_out 1 --random_seed 0
+#python ./training/mouse_gastrulation.py --batch_left_out 2 --random_seed 0
+#python ./training/mouse_gastrulation.py --batch_left_out 3 --random_seed 0
+#python ./training/mouse_gastrulation.py --batch_left_out 4 --random_seed 0
 
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 0 --random_seed 0
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 1 --random_seed 0
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 2 --random_seed 0
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 3 --random_seed 0
+#python ./training/mouse_gastrulation.py --batch_left_out 0 --random_seed 37
+#python ./training/mouse_gastrulation.py --batch_left_out 0 --random_seed 8790
 
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 0 --random_seed 37
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 1 --random_seed 37
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 2 --random_seed 37
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 3 --random_seed 37
+#python ./testing/revision_mouse_gastrulation.py --batch_left_out 0 --random_seed 0
+#python ./testing/revision_mouse_gastrulation.py --batch_left_out 1 --random_seed 0
+#python ./testing/revision_mouse_gastrulation.py --batch_left_out 2 --random_seed 0
+#python ./testing/revision_mouse_gastrulation.py --batch_left_out 3 --random_seed 0
+#python ./testing/revision_mouse_gastrulation.py --batch_left_out 4 --random_seed 0
 
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 0 --random_seed 8790
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 1 --random_seed 8790
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 2 --random_seed 8790
-#python ./testing/revision_human_bonemarrow_freeCovariateModel.py --batch_left_out 3 --random_seed 8790
-
-# testing without correction model error and from zero
-# first over batches, then over random seeds
-
-python ./testing/revision_human_bonemarrow_freeCovariateModel_fromZero.py --batch_left_out 0 --random_seed 0
-#python ./testing/revision_human_bonemarrow_freeCovariateModel_fromZero.py --batch_left_out 1 --random_seed 0
-#python ./testing/revision_human_bonemarrow_freeCovariateModel_fromZero.py --batch_left_out 2 --random_seed 0
-#python ./testing/revision_human_bonemarrow_freeCovariateModel_fromZero.py --batch_left_out 3 --random_seed 0
+# analysis
+python ./analysis/revision_mouse_gastrulation_predictions.py
+python ./analysis/revision_mouse_gastrulation_covariate_representations.py
