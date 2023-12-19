@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from omicsdgd.latent import RepresentationLayer
-from omicsdgd.latent import GaussianMixture
+from omicsdgd.latent import GaussianMixtureSupervised
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -51,7 +51,10 @@ def learn_new_representations(
     resampling_samples=1,
     include_correction_error=True,
     indices_of_new_distribution=None,
-    start_from_zero=[False,False]
+    start_from_zero=[False,False],
+    init_covariate_supervised=None,
+    supervised=False,
+    cov_beta=1
 ):
     """
     this function creates samples from the trained GMM for each new point,
@@ -74,29 +77,35 @@ def learn_new_representations(
     #    print("WARNING: there are unknown distributions in the data\nWill learn extra components in the GMM")
     #    print(gmm.n_mix_comp, len(data_loader.dataset.meta.unique())) # apparently site1 had ha whole cell type
     correction_hook = False
-    """
+    #"""
     if correction_model is not None:
-        if correction_model.n_mix_comp < data_loader.dataset.correction_classes:
-            print("WARNING: there are unknown distributions in the data\nWill learn extra components in the batch GMM")
-            n_correction_classes_old = correction_model.n_mix_comp
-            correction_model = find_new_component(
-                data_loader,
-                decoder,
-                correction_model,
-                indices_of_new_distribution,
-                other_gmm=gmm)
-            correction_hook = True
-    """
+        if indices_of_new_distribution is not None:
+            if correction_model.n_mix_comp < data_loader.dataset.correction_classes:
+                print("WARNING: there are unknown distributions in the data\nWill learn extra components in the batch GMM")
+                n_correction_classes_old = correction_model.n_mix_comp
+                correction_model = find_new_component(
+                    data_loader,
+                    decoder,
+                    correction_model,
+                    indices_of_new_distribution,
+                    other_gmm=gmm)
+                correction_hook = True
+    #"""
 
     # make temporary representations with samples from each component per data point
     if correction_model is not None:
         if not start_from_zero[1]:
-            potential_reps = prepare_potential_reps(
-                [
-                    gmm.sample_new_points(resampling_type, resampling_samples),
-                    correction_model.sample_new_points(resampling_type, resampling_samples),
-                ]
-            )
+            if init_covariate_supervised is not None:
+                potential_reps = prepare_potential_reps(
+                    [gmm.sample_new_points(resampling_type, resampling_samples), torch.zeros((resampling_samples, correction_model.dim))]
+                )
+            else:
+                potential_reps = prepare_potential_reps(
+                    [
+                        gmm.sample_new_points(resampling_type, resampling_samples),
+                        correction_model.sample_new_points(resampling_type, resampling_samples),
+                    ]
+                )
         else:
             potential_reps = prepare_potential_reps(
                 [gmm.sample_new_points(resampling_type, resampling_samples), torch.zeros((resampling_samples, correction_model.dim))]
@@ -130,6 +139,13 @@ def learn_new_representations(
                 scale=[reshape_scaling_factor(lib[:, xxx], 3) for xxx in range(decoder.n_out_groups)],
                 reduction="sample",
             )
+        else:
+            recon_loss_x = decoder.loss(
+                [predictions[0].unsqueeze(0)],
+                [x],
+                scale=[reshape_scaling_factor(lib[:, 0], 3)],
+                reduction="sample",
+            )
         best_fit_ids = torch.argmin(recon_loss_x, dim=-1).detach().cpu()
         rep_init_values[i, :] = potential_reps.clone()[best_fit_ids, :]
 
@@ -143,34 +159,58 @@ def learn_new_representations(
     newrep_optimizer = torch.optim.Adam(new_rep.parameters(), lr=lrs[0], weight_decay=1e-4, betas=(0.5, 0.7))
     test_correction_rep = None
     if correction_model is not None:
-        if not start_from_zero[1]:
+        if (not start_from_zero[1]) and (init_covariate_supervised is None):
             test_correction_rep = RepresentationLayer(
                 n_rep=2, n_sample=n_samples_new, value_init=rep_init_values[:, gmm.dim :]
             ).to(device)
-            correction_rep_optim = torch.optim.Adam(
-                test_correction_rep.parameters(), lr=lrs[1], weight_decay=1e-4, betas=(0.5, 0.7)
-            )
-            if correction_hook:
-                correction_model_optim = torch.optim.Adam(
-                correction_model.parameters(), lr=lrs[0], weight_decay=0, betas=(0.5, 0.7)
-                )
+        elif init_covariate_supervised is not None:
+            if indices_of_new_distribution is not None:
+                init_covariate_supervised = np.array(init_covariate_supervised)
+                if (len(np.unique(init_covariate_supervised)) > correction_model.n_mix_comp):
+                    raise NotImplementedError("I can currently only handle one new covariate class")
+                #print(init_covariate_supervised[indices_of_new_distribution])
+                # change the indices of the new distribution to the last component
+                # count and print the number of unique values in the init covariate supervised, like with value_counts
+                init_covariate_supervised[indices_of_new_distribution] = correction_model.n_mix_comp - 1
+                #print(init_covariate_supervised[indices_of_new_distribution])
+            with torch.no_grad():
+                cov_means = torch.zeros((len(data_loader.dataset), correction_model.dim))
+                for i in range(len(data_loader.dataset)):
+                    cov_means[i,:] = correction_model.mean[init_covariate_supervised[i],:].clone().detach().cpu()
+            test_correction_rep = RepresentationLayer(
+                n_rep=2, n_sample=n_samples_new, value_init=cov_means
+            ).to(device)
         else:
             test_correction_rep = RepresentationLayer(
                 n_rep=2, n_sample=n_samples_new, value_init="zero"
             ).to(device)
-            correction_rep_optim = torch.optim.Adam(
-                test_correction_rep.parameters(), lr=lrs[1], weight_decay=1e-4, betas=(0.5, 0.7)
+        correction_rep_optim = torch.optim.Adam(
+            test_correction_rep.parameters(), lr=lrs[0], weight_decay=1e-4, betas=(0.5, 0.7)
+        )
+        if correction_hook:
+            correction_model_optim = torch.optim.Adam(
+            correction_model.parameters(), lr=lrs[1], weight_decay=0, betas=(0.5, 0.7)
             )
-            if correction_hook:
-                correction_model_optim = torch.optim.Adam(
-                correction_model.parameters(), lr=lrs[0], weight_decay=0, betas=(0.5, 0.7)
-                )
 
     rep_init_values = None
 
     #####################
     # training reps (only)
     #####################
+    """
+    supervised_warmup = 20
+    if supervised and (init_covariate_supervised is not None):
+        # fine-tune the relevant neurons in the first layer of the decoder
+        for param in decoder.parameters():
+            param.requires_grad = False
+        # I want to finetune the last neurons of the first layer, corresponding to the covariate model (correction_rep input)
+        indices_covariate_input = np.arange(new_rep.n_rep, new_rep.n_rep + test_correction_rep.n_rep)
+        # print the old weights
+        #print("old weights: ", decoder.main[0].weight[:, indices_covariate_input])
+        decoder.main[0].weight.requires_grad = True
+        decoder.main[0].bias.requires_grad = True # did not exist for first version
+        decoder_optimizer = torch.optim.Adam(decoder.parameters(), lr=lrs[0]/100, weight_decay=1e-4, betas=(0.5,0.7)) # was /100 for first version
+    """
     print("training selected reps for ", n_epochs, " epochs")
     for epoch in range(n_epochs):
         newrep_optimizer.zero_grad()
@@ -178,9 +218,12 @@ def learn_new_representations(
             correction_rep_optim.zero_grad()
         corr_loss = 0
         e_loss = 0
+        recon_loss = 0
         for x, lib, i in data_loader:
             if correction_hook:
                 correction_model_optim.zero_grad()
+                #if supervised:
+                #    decoder_optimizer.zero_grad()
             x = x.to(device)
             lib = lib.to(device)
             if correction_model is not None:
@@ -205,10 +248,15 @@ def learn_new_representations(
             gmm_error = gmm(z).sum()
             correction_error = torch.zeros(1).to(device)
             if correction_model is not None:
-                correction_error += correction_model(z_correction).sum()
+                if supervised:
+                    # get the component whose mean was used to initialize each sample
+                    supervision_idx = init_covariate_supervised[i]
+                    correction_error += correction_model(z_correction, supervision_idx).sum()
+                else:
+                    correction_error += correction_model(z_correction).sum()
                 corr_loss += correction_error.item()
             if include_correction_error:
-                loss = recon_loss_x.clone() + gmm_error.clone() + correction_error.clone()
+                loss = recon_loss_x.clone() + gmm_error.clone() + correction_error.clone() * cov_beta
             else:
                 loss = recon_loss_x.clone() + gmm_error.clone()
             loss.backward()
@@ -217,19 +265,125 @@ def learn_new_representations(
                 correction_model.neglogvar.grad[:n_correction_classes_old,:] = 0
                 correction_model.weight.grad[:n_correction_classes_old] = 0
                 correction_model_optim.step()
+                #if supervised and (epoch > supervised_warmup):
+                #    decoder.main[0].weight.grad[:, :new_rep.n_rep] = 0
+                #    decoder_optimizer.step()
             e_loss += loss.item()
+            recon_loss += recon_loss_x.clone().item()
 
         newrep_optimizer.step()
         if correction_model is not None:
             correction_rep_optim.step()
         e_loss /= (len(data_loader.dataset)*data_loader.dataset.n_features)
-        print("epoch: ", epoch, " loss: ", e_loss)
+        recon_loss /= (len(data_loader.dataset)*data_loader.dataset.n_features)
+        if correction_model is not None:
+            corr_loss /= (len(data_loader.dataset)*data_loader.dataset.n_features)
+            print("epoch: ", epoch, " loss: ", e_loss, " recon: ", recon_loss, " corr: ", corr_loss)
+        else:
+            print("epoch: ", epoch, " loss: ", e_loss, " recon: ", recon_loss)
+    
+    #with torch.no_grad():
+    #    print("new weights: ", decoder.main[0].weight[:, indices_covariate_input])
     
     if correction_hook:
-        return new_rep, test_correction_rep, correction_model
+        if supervised:
+            return decoder, new_rep, test_correction_rep, correction_model
+        return None, new_rep, test_correction_rep, correction_model
     else:
-        return new_rep, test_correction_rep, None
+        return None, new_rep, test_correction_rep, None
 
+def find_new_component(data_loader,
+                       decoder,
+                       gmm_model,
+                       idx_of_new_distribution,
+                       rep_type="correction",
+                       other_gmm=None,
+                       resampling_type="mean",
+                       resampling_samples=1
+                       ):
+    ###
+    # sample new GMM components and select the one that fits the unseen data best
+    ###
+    n_samples_newdist = len(idx_of_new_distribution)
+    # create new GMM model
+    """
+    n_classes_new = 20
+    gmm_model_new = GaussianMixture(
+        n_mix_comp=n_classes_new,
+        dim=gmm_model.dim,
+        mean_init=(gmm_model._mean_prior.radius,gmm_model._mean_prior.sharpness),
+        sd_init=gmm_model._sd_init,
+        weight_alpha=2).to(device)
+    # make all potential representations
+    if rep_type == "correction":
+        potential_reps = prepare_potential_reps(
+                [
+                    other_gmm.sample_new_points(resampling_type, resampling_samples),
+                    gmm_model_new.sample_new_points(resampling_type, resampling_samples),
+                ]
+            )
+    else:
+        if other_gmm is not None:
+            potential_reps = prepare_potential_reps(
+                    [
+                        gmm_model_new.sample_new_points(resampling_type, resampling_samples),
+                        other_gmm.sample_new_points(resampling_type, resampling_samples)
+                    ]
+                )
+        else:
+            potential_reps = gmm_model.sample_new_points(resampling_type, resampling_samples)
+    # compute losses for all potential representations
+    rep_init_values = torch.zeros((n_samples_newdist, potential_reps.shape[-1]))
+    predictions = decoder(potential_reps.to(device))
+    for x, lib, i in data_loader:
+        keep = [i_elem for i_elem, loader_idx in enumerate(i.numpy()) if loader_idx in idx_of_new_distribution]
+        i_newdist = [a for a,b in enumerate(idx_of_new_distribution) if b in i.numpy()]
+        x = x[keep,:].unsqueeze(1).to(device)
+        lib = lib[keep,:].to(device)
+        if data_loader.dataset.modality_switch is not None:
+            recon_loss_x = decoder.loss(
+                [predictions[comp].unsqueeze(0) for comp in range(len(predictions))],
+                [x[:, :, : data_loader.dataset.modality_switch], x[:, :, data_loader.dataset.modality_switch :]],
+                scale=[reshape_scaling_factor(lib[:, xxx], 3) for xxx in range(decoder.n_out_groups)],
+                reduction="sample",
+            )
+        best_fit_ids = torch.argmin(recon_loss_x, dim=-1).detach().cpu()
+        rep_init_values[i_newdist, :] = potential_reps.clone()[best_fit_ids, :]
+    # count how often each new component has been chosen
+    best_component = [0,0]
+    for c in range(gmm_model_new.n_mix_comp):
+        n_times_chosen = len(np.unique(torch.where(rep_init_values[:,-2:] == gmm_model_new.mean.detach()[c,:])[0].numpy()))
+        if n_times_chosen > best_component[1]:
+            best_component = [c, n_times_chosen]
+    best_new_mean = gmm_model_new.mean.detach().cpu()[best_component[0],:]
+    best_new_nlv = gmm_model_new.neglogvar.detach().cpu()[best_component[0],:]
+    best_new_weight = gmm_model_new.weight.detach().cpu()[best_component[0]]
+    ###
+    # take the best component and add it to the existing correction model
+    ###
+    """
+    n_classes_old = gmm_model.n_mix_comp
+    n_classes_new = data_loader.dataset.correction_classes
+    print("adding {} new correction classes".format(n_classes_new - n_classes_old))
+    gmm_model_new = GaussianMixtureSupervised(
+        Nclass=n_classes_new,
+        Ncompperclass=1,
+        dim=gmm_model.dim,
+        mean_init=(gmm_model._mean_prior.radius,gmm_model._mean_prior.sharpness),
+        sd_init=gmm_model._sd_init,
+        alpha=2).to(device)
+    with torch.no_grad():
+        gmm_model_new.mean[:n_classes_old,:] = gmm_model.mean.clone().detach()
+        gmm_model_new.neglogvar[:n_classes_old,:] = gmm_model.neglogvar.clone().detach()
+        gmm_model_new.weight[:n_classes_old] = gmm_model.weight.clone().detach()
+        gmm_model_new.mean[-1,:] = 0
+    print("old correction model: ", gmm_model, gmm_model.mean)
+    print("new correction model: ", gmm_model_new)
+    gmm_model = gmm_model_new
+
+    return gmm_model
+
+"""
 def find_new_component(data_loader,
                        decoder,
                        gmm_model,
@@ -319,6 +473,7 @@ def find_new_component(data_loader,
     gmm_model = gmm_model_new
 
     return gmm_model
+"""
 
 """
 def learn_new_representations(

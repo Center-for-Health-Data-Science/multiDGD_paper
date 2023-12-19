@@ -324,22 +324,74 @@ def classify_binary_output(target, mod, scaling_factor, switch, threshold, batch
     
     return true_positives, false_positives, true_negatives, false_negatives
 
-def binary_output_scores(target, mod, scaling_factor, switch, threshold, batch_size=5000, feature_indices=None):
-    '''returns FPR, FNR, balanced accuracy, LR+ and LR-'''
-    tp, fp, tn, fn = classify_binary_output(target, mod, scaling_factor, switch, threshold, batch_size, feature_indices)
-    tp = tp.sum()
-    fp = fp.sum()
-    tn = tn.sum()
-    fn = fn.sum()
-    tpr = tp / (tp + fn) # sensitivity
-    tnr = tn / (tn + fp) # specificity
-    fpr = 1 - tnr
-    fnr = 1 - tpr
-    balanced_accuracy = (tpr + tnr) / 2
-    positive_likelihood_ratio = tpr/fpr
-    negative_likelihood_ratio = fnr/tnr
+def classify_binary_output_feature(target, mod, scaling_factor, switch, threshold, batch_size=5000, feature_indices=None):
+    '''calculating true positives, false positives, true negatives and false negatives'''
+    print('classifying binary output')
+    
+    #n_features = target.shape[1]
+    
+    x_accessibility = binarize(torch.Tensor(target.X[:,switch:].todense())).int()
+    y_accessibility = mod.get_accessibility_estimates(target, indices=None)
+    if type(y_accessibility) is not torch.Tensor:
+        if type(y_accessibility) == pd.core.frame.DataFrame:
+            y_accessibility = torch.from_numpy(y_accessibility.values)
+            y_accessibility = y_accessibility.detach().cpu()
+    else:
+        y_accessibility = y_accessibility.detach().cpu()*scaling_factor
+    y_accessibility = binarize(y_accessibility, threshold).int()
+    if feature_indices is not None:
+        x_accessibility = x_accessibility[:,feature_indices]
+        y_accessibility = y_accessibility[:,feature_indices]
+    p = (x_accessibility == 1)
+    pp = (y_accessibility == 1)
+    true_positives = torch.logical_and(p,pp).sum(0).float()
+    true_negatives = torch.logical_and(~p,~pp).sum(0).float()
+    false_positives = (y_accessibility > x_accessibility).sum(0).float()
+    false_negatives = (y_accessibility < x_accessibility).sum(0).float()
+    
+    return true_positives, false_positives, true_negatives, false_negatives
 
-    return tpr.item(), tnr.item(), balanced_accuracy.item(), positive_likelihood_ratio.item(), negative_likelihood_ratio.item()
+def binary_output_scores(target, mod, scaling_factor, switch, threshold, batch_size=5000, feature_indices=None, reduction="sample", return_se=False, return_all=False):
+    '''returns FPR, FNR, balanced accuracy, LR+ and LR-'''
+    if reduction == "sample":
+        tp, fp, tn, fn = classify_binary_output(target, mod, scaling_factor, switch, threshold, batch_size, feature_indices)
+    elif reduction == "feature":
+        tp, fp, tn, fn = classify_binary_output_feature(target, mod, scaling_factor, switch, threshold, batch_size, feature_indices)
+    else:
+        raise ValueError('incorrect reduction submitted. Can only be `sample` or `feature`.')
+    if not return_all:
+        if return_se:
+            tpr = tp / (tp + fn) # sensitivity
+            tnr = tn / (tn + fp) # specificity
+            fpr = 1 - tnr
+            fnr = 1 - tpr
+            balanced_accuracy = (tpr + tnr) / 2
+            positive_likelihood_ratio = tpr/fpr
+            negative_likelihood_ratio = fnr/tnr
+            return [tpr.mean().item(), (tpr.std() / np.sqrt(tpr.shape[0])).item()], [tnr.mean().item(), (tnr.std() / np.sqrt(tnr.shape[0])).item()], [balanced_accuracy.mean().item(), (balanced_accuracy.std() / np.sqrt(balanced_accuracy.shape[0])).item()], [positive_likelihood_ratio.mean().item(), (positive_likelihood_ratio.std() / np.sqrt(positive_likelihood_ratio.shape[0])).item()], [negative_likelihood_ratio.mean().item(), (negative_likelihood_ratio.std() / np.sqrt(negative_likelihood_ratio.shape[0])).item()]
+        
+        if not return_se:
+            tp = tp.sum()
+            fp = fp.sum()
+            tn = tn.sum()
+            fn = fn.sum()
+            tpr = tp / (tp + fn) # sensitivity
+            tnr = tn / (tn + fp) # specificity
+            fpr = 1 - tnr
+            fnr = 1 - tpr
+            balanced_accuracy = (tpr + tnr) / 2
+            positive_likelihood_ratio = tpr/fpr
+            negative_likelihood_ratio = fnr/tnr
+            return tpr.item(), tnr.item(), balanced_accuracy.item(), positive_likelihood_ratio.item(), negative_likelihood_ratio.item()
+    else:
+        tpr = tp / (tp + fn) # sensitivity
+        tnr = tn / (tn + fp) # specificity
+        fpr = 1 - tnr
+        fnr = 1 - tpr
+        balanced_accuracy = (tpr + tnr) / 2
+        positive_likelihood_ratio = tpr/fpr
+        negative_likelihood_ratio = fnr/tnr
+        return tpr, tnr, balanced_accuracy, positive_likelihood_ratio, negative_likelihood_ratio
 
 def balanced_accuracies(target, mod, scaling_factor, switch, threshold, batch_size=5000):
     '''returns FPR, FNR, balanced accuracy, LR+ and LR-'''
@@ -363,40 +415,71 @@ def compute_error_per_sample(target, output, reduction_type='ms'):
     else:
         raise ValueError('invalid reduction type given. Can only be `ms` or `ma`.')
 
-def compute_expression_error(target, mod, scaling_factor, switch, batch_size=5000, error_type='rmse', feature_indices=None):
+def compute_error_per_feature(target, output, reduction_type='ms'):
+    '''compute sample-wise error
+    It can be of type `ms` (mean squared) or `ma` (mean absolute)
+    '''
+    error = target - output
+    if reduction_type == 'ms':
+        return torch.mean(error**2, dim=0)
+    elif reduction_type == 'ma':
+        return torch.mean(torch.abs(error), dim=0)
+    else:
+        raise ValueError('invalid reduction type given. Can only be `ms` or `ma`.')
+
+def compute_expression_error(target, mod, scaling_factor, switch, batch_size=5000, error_type='rmse', feature_indices=None, reduction="sample", return_se=False):
     '''computes expression error for target (given as anndata object)'''
-    n_samples = target.shape[0]
-
-    errors = torch.zeros((n_samples))
-
-    for i in range(int(n_samples/batch_size)+1):
-        print('   ',round(i/(int(n_samples/batch_size))*100),'%')
-        start = i*batch_size
-        end = min((i+1)*batch_size,n_samples)
-        indices = np.arange(start,end,1)
-        #target.n_vars = switch # because of multivi
-        y_expression = mod.get_normalized_expression(target, indices=indices)
+    
+    if reduction == "sample":
+        n_samples = target.shape[0]
+        errors = torch.zeros((n_samples))
+        for i in range(int(n_samples/batch_size)+1):
+            print('   ',round(i/(int(n_samples/batch_size))*100),'%')
+            start = i*batch_size
+            end = min((i+1)*batch_size,n_samples)
+            indices = np.arange(start,end,1)
+            #target.n_vars = switch # because of multivi
+            y_expression = mod.get_normalized_expression(target, indices=indices).detach().cpu()
+            if type(y_expression) is not torch.Tensor:
+                if type(y_expression) == pd.core.frame.DataFrame:
+                    y_expression = torch.from_numpy(y_expression.values)
+            y_expression *= scaling_factor[indices]
+            if feature_indices is not None:
+                y_expression = y_expression[:,feature_indices]
+                x_expression = torch.Tensor(target.X[indices,:switch].todense())[:,feature_indices]
+            else:
+                x_expression = torch.Tensor(target.X[indices,:switch].todense())
+            if reduction == "sample":
+                if 'rmse' in error_type:
+                    errors[indices] = compute_error_per_sample(x_expression, y_expression, reduction_type='ms')
+                elif 'mae' in error_type:
+                    errors[indices] = compute_error_per_sample(x_expression, y_expression, reduction_type='ma')
+                else:
+                    raise ValueError('incorrect error_type submitted. Can only be `rmse` or `mae`.')
+    elif reduction == "feature":
+        y_expression = mod.get_normalized_expression(target, indices=None).detach().cpu()
         if type(y_expression) is not torch.Tensor:
             if type(y_expression) == pd.core.frame.DataFrame:
                 y_expression = torch.from_numpy(y_expression.values)
-        y_expression *= scaling_factor[indices]
+        y_expression *= scaling_factor
         if feature_indices is not None:
             y_expression = y_expression[:,feature_indices]
-            x_expression = torch.Tensor(target.X[indices,:switch].todense())[:,feature_indices]
+            x_expression = torch.Tensor(target.X[:,:switch].todense())[:,feature_indices]
         else:
-            x_expression = torch.Tensor(target.X[indices,:switch].todense())
-        #print(y_expression[:10,:10])
-        #print(torch.Tensor(target.X[indices,:switch].todense())[:10,:10])
-        if error_type == 'rmse':
-            errors[indices] = compute_error_per_sample(x_expression, y_expression, reduction_type='ms')
-        elif error_type == 'mae':
-            errors[indices] = compute_error_per_sample(x_expression, y_expression, reduction_type='ma')
-        elif error_type == 'mae_sample':
-            errors[indices] = compute_error_per_sample(x_expression, y_expression, reduction_type='ma')
+            x_expression = torch.Tensor(target.X[:,:switch].todense())
+        if 'rmse' in error_type:
+            errors = compute_error_per_feature(x_expression, y_expression, reduction_type='ms')
+        elif 'mae' in error_type:
+            errors = compute_error_per_feature(x_expression, y_expression, reduction_type='ma')
         else:
             raise ValueError('incorrect error_type submitted. Can only be `rmse` or `mae`.')
     
     # print where the 5 highest errors are
+    if return_se:
+        if error_type == 'rmse':
+            return [torch.sqrt(torch.mean(errors)).item(), (torch.sqrt(errors).std() / np.sqrt(errors.shape[0])).item()]
+        elif error_type == 'mae':
+            return [torch.mean(errors).item(), (errors.std() / np.sqrt(errors.shape[0])).item()]
     if error_type == 'rmse':
         out_error = torch.sqrt(torch.mean(errors))
         return out_error.item()
@@ -442,6 +525,48 @@ def testset_reconstruction_evaluation(testdata, mod, modality_switch, library, t
             df_metrics = df_metrics.append(df_temp)
     print('confusion matrix done')
 
+    return df_metrics
+
+def testset_reconstruction_evaluation_extended(testdata, mod, modality_switch, library, thresholds=[0.5], batch_size=5000, feature_indices=[None,None]):
+    '''at the moment only valid for multiome'''
+
+    # RMSE of expression values
+    #rmse = compute_expression_error(testdata[:,:modality_switch], mod, library[:,0].unsqueeze(1), modality_switch)
+    rmse_sample = compute_expression_error(testdata, mod, library[:,0].unsqueeze(1), modality_switch, batch_size=batch_size, feature_indices=feature_indices[0], reduction="sample", return_se=True)
+    rmse_feature = compute_expression_error(testdata, mod, library[:,0].unsqueeze(1), modality_switch, batch_size=batch_size, feature_indices=feature_indices[0], reduction="feature", return_se=True)
+    print(rmse_sample)
+    print(rmse_feature)
+    print('rmse done')
+
+    # MAE of expression values
+    #mae = compute_expression_error(testdata[:,:modality_switch], mod, library[:,0].unsqueeze(1), modality_switch, error_type='mae')
+    mae_sample = compute_expression_error(testdata, mod, library[:,0].unsqueeze(1), modality_switch, error_type='mae', batch_size=batch_size, feature_indices=feature_indices[0], reduction="sample", return_se=True)
+    mae_feature = compute_expression_error(testdata, mod, library[:,0].unsqueeze(1), modality_switch, error_type='mae', batch_size=batch_size, feature_indices=feature_indices[0], reduction="feature", return_se=True)
+    print(mae_sample)
+    print(mae_feature)
+    print('mae done')
+
+    # metrics for binary accessibility output
+    #tpr, tnr, balanced_accuracy, positive_likelihood_ratio, negative_likelihood_ratio = binary_output_scores(testdata[:,modality_switch:], mod, library[:,1].unsqueeze(1), modality_switch)
+    tpr_s, tnr_s, balanced_accuracy_s, positive_likelihood_ratio_s, negative_likelihood_ratio_s = binary_output_scores(testdata, mod, library[:,1].unsqueeze(1), modality_switch, thresholds[0], batch_size=batch_size, feature_indices=feature_indices[1], reduction="sample", return_se=True)
+    tpr_f, tnr_f, balanced_accuracy_f, positive_likelihood_ratio_f, negative_likelihood_ratio_f = binary_output_scores(testdata, mod, library[:,1].unsqueeze(1), modality_switch, thresholds[0], batch_size=batch_size, feature_indices=feature_indices[1], reduction="feature", return_se=True)
+    print(tpr_s, balanced_accuracy_s, positive_likelihood_ratio_s, negative_likelihood_ratio_s)
+    print(tpr_f, balanced_accuracy_f, positive_likelihood_ratio_f, negative_likelihood_ratio_f)
+    print('ba done')
+
+    df_metrics = pd.DataFrame({
+        'RMSE (rna)': [rmse_sample[0], rmse_sample[1], rmse_feature[0], rmse_feature[1]],
+        'MAE (rna)': [mae_sample[0], mae_sample[1], mae_feature[0], mae_feature[1]],
+        'TPR (atac)': [tpr_s[0], tpr_s[1], tpr_f[0], tpr_f[1]],
+        'TNR (atac)': [tnr_s[0], tnr_s[1], tnr_f[0], tnr_f[1]],
+        'balanced accuracy': [balanced_accuracy_s[0], balanced_accuracy_s[1], balanced_accuracy_f[0], balanced_accuracy_f[1]],
+        'LR+': [positive_likelihood_ratio_s[0], positive_likelihood_ratio_s[1], positive_likelihood_ratio_f[0], positive_likelihood_ratio_f[1]],
+        'LR-': [negative_likelihood_ratio_s[0], negative_likelihood_ratio_s[1], negative_likelihood_ratio_f[0], negative_likelihood_ratio_f[1]],
+        'averaging': ['sample', 'sample', 'feature', 'feature'],
+        'metric_type': ['mean', 'SE', 'mean', 'SE']
+        #'binary_threshold': thresholds[0]
+    })
+    df_metrics['binary_threshold'] = thresholds[0]
     return df_metrics
 
 def knn_adjacency(dist_mtrx, k=10):
