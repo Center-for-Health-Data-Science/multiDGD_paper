@@ -36,6 +36,7 @@ train_val_split = [
     list(np.where(adata.obs["train_val_test"] == "validation")[0]),
 ]
 
+#"""
 ###
 # initialize model
 ###
@@ -66,6 +67,11 @@ print("   training")
 model.train(n_epochs=epochs, train_minimum=train_minimum, developer_mode=True, stop_after=stop_after)
 model.save()
 print("   model saved")
+#"""
+
+#model = DGD.load(
+#    data=adata[train_val_split[0]], save_dir="../results/trained_models/" + data_name + "/", model_name=data_name + "_l20_h3_rs" + str(random_seed)+"_scDGD"
+#)
 
 ###
 # predict for test set

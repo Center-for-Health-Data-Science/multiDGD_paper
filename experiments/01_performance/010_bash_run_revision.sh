@@ -9,10 +9,10 @@
 
 #requesting GPUs: name (titanx) and number (1)
 #the current GPU options are: A100 (14 avail, 40 GB), A40 (10 Avail, 40 GB), titanrtx (48 avail, 24 GB), titanx (24 avail, 12 GB), testlak40, testlak20, gtx1080
-#SBATCH -p gpu --gres=gpu:titanx:1
+#SBATCH -p gpu --gres=gpu:titanrtx:1
 
 #Note that a program will be killed once it exceeds this time!
-#SBATCH --time=20:00:00
+#SBATCH --time=01:00:00
 
 #Skipping many options! see man sbatch
 # From here on, we can start our program
@@ -69,7 +69,7 @@ echo $CUDA_VISIBLE_DEVICES
 
 # run with RNA only and no covariate (scDGD)
 
-python3 ./training/revision_human_bonemarrow_scDGD.py --random_seed 0
+#python3 ./training/revision_human_bonemarrow_scDGD.py --random_seed 0
 #python3 ./training/revision_human_bonemarrow_scDGD.py --random_seed 37
 #python3 ./training/revision_human_bonemarrow_scDGD.py --random_seed 8790
 
@@ -80,3 +80,8 @@ python3 ./training/revision_human_bonemarrow_scDGD.py --random_seed 0
 #python3 ./training/revision_human_brain_scDGD.py --random_seed 0
 #python3 ./training/revision_human_brain_scDGD.py --random_seed 37
 #python3 ./training/revision_human_brain_scDGD.py --random_seed 8790
+
+###
+
+# analyis
+python ./analysis/revision_human_bonemarrow_predictions.py

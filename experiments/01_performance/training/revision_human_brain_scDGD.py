@@ -26,8 +26,11 @@ print("training multiDGD on human brain data with random seed ", random_seed)
 ###
 data_name = "human_brain"
 mudata = md.read("../../data/human_brain.h5mu", backed=False)
+for key in mudata.obs.keys():
+    mudata['rna'].obs[key] = mudata.obs[key]
+mudata['rna'].obs["train_val_test"] = mudata.obs["train_val_test"].values
 # delete the ATAC modality
-mudata = md.MuData(mudata['rna'])
+mudata = mudata['rna']
 print(mudata)
 
 train_val_split = [

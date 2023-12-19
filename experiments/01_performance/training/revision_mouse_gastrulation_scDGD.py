@@ -23,8 +23,12 @@ print("training multiDGD on mouse gastrulation data with random seed ", random_s
 # load data
 ###
 mudata = md.read("../../data/mouse_gastrulation.h5mu", backed=False)
+# add all mudata.obs columns to mudata['rna'].obs
+for key in mudata.obs.keys():
+    mudata['rna'].obs[key] = mudata.obs[key]
+mudata['rna'].obs["train_val_test"] = mudata.obs["train_val_test"].values
 # delete the ATAC modality
-mudata = md.MuData(mudata['rna'])
+mudata = mudata['rna']
 print(mudata)
 
 train_val_split = [
