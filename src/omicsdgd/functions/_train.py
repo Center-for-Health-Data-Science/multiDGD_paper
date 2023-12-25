@@ -42,7 +42,8 @@ def train_dgd(
     train_minimum,
     device,
     save_dir='./',
-    developer_mode=False
+    developer_mode=False,
+    update_covariance_prior=False
     ):
 
     '''main train function'''
@@ -89,11 +90,11 @@ def train_dgd(
             correction_val_rep_optim = torch.optim.Adam(correction_val_rep.parameters(), lr=learning_rates[1], weight_decay=wd, betas=(adam_betas[0],adam_betas[1]))
 
     # in case of mosaic data, add a representation for the 3 reps of the same cell
-    if train_loader.dataset.mosaic_train_idx is not None:
-        representation_mosaic = RepresentationLayer(n_rep=representation.n_rep,
-                                                    n_sample=train_loader.dataset.data_triangle.shape[0],
-                                                    value_init='zero').to(device)
-        mosaic_optimizer = torch.optim.Adam(representation_mosaic.parameters(), lr=learning_rates[1], weight_decay=wd, betas=(adam_betas[0],adam_betas[1]))
+    #if train_loader.dataset.mosaic_train_idx is not None:
+    #    representation_mosaic = RepresentationLayer(n_rep=representation.n_rep,
+    #                                                n_sample=train_loader.dataset.data_triangle.shape[0],
+    #                                                value_init='zero').to(device)
+    #    mosaic_optimizer = torch.optim.Adam(representation_mosaic.parameters(), lr=learning_rates[1], weight_decay=wd, betas=(adam_betas[0],adam_betas[1]))
     
     ###
     # define metrics to observe during training
@@ -146,6 +147,7 @@ def train_dgd(
         ###
         # in the case of mosaic data, add a run where distances between reps for the same cell
         # are minimized
+        """
         if train_loader.dataset.mosaic_train_idx is not None:
             mosaic_batch_size = 64
             n_split_samples = int(train_loader.dataset.data_triangle.shape[0]/3)
@@ -176,7 +178,10 @@ def train_dgd(
                     scale=[lib[:,xxx].unsqueeze(1) for xxx in range(decoder.n_out_groups)],
                     mask=mask
                 )
-                gmm_error = gmm(z).sum()
+                if update_covariance_prior:
+                    gmm_error = gmm(z, cov_prior=False).sum()
+                else:
+                    gmm_error = gmm(z).sum()
                 # add representation trianlge loss to mosaic loss
                 mosaic_loss = rep_triangle_loss(z,idx_paired).sum()
                 triangle_loss += mosaic_loss.item()/len(idx_paired) # for logging
@@ -187,6 +192,7 @@ def train_dgd(
                 decoder_optimizer.step()
                 # update parameters
             mosaic_optimizer.step()
+        """
         ###
 
         for x,lib,i in train_loader:
@@ -278,6 +284,9 @@ def train_dgd(
         #total_loss[-1] /= n_samples
         #reconstruction_loss[-1] /= n_samples
         #distribution_loss[-1] /= n_samples
+            
+        #if update_covariance_prior:
+        #    gmm.update_covariance_prior()
         
         if not developer_mode:
             progress_bar.set_postfix(loss=total_loss[-1]/(train_loader.dataset.n_features*n_samples), reconstruction_loss=reconstruction_loss[-1]/(train_loader.dataset.n_features*n_samples))
@@ -358,8 +367,11 @@ def train_dgd(
                 log_dict['AdjustedRandIndex_fromMetaLabel'] = clustering_metric(representation, gmm, train_loader.dataset.get_labels())
             if train_loader.dataset.correction is not None:
                 log_dict['correction_AdjustedSilhouetteWidth'] = silhouette_score(representation.z.detach().cpu(), train_loader.dataset.correction)
-            if train_loader.dataset.mosaic_train_idx is not None:
-                log_dict['triangle_rep_loss'] = triangle_loss
+            #if train_loader.dataset.mosaic_train_idx is not None:
+            #    log_dict['triangle_rep_loss'] = triangle_loss
+            if update_covariance_prior:
+                log_dict['covariance_mean'] = gmm.covariance.detach().cpu().mean().item()
+                log_dict['effective_components'] = gmm.n_components_used
 
             wandb.log(log_dict)
         

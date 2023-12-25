@@ -544,6 +544,7 @@ class DGD(nn.Module):
         stop_after=10,
         train_minimum=50,
         developer_mode=False,
+        update_covariance_prior=False
     ):
         """
         train model for n_epochs
@@ -612,6 +613,7 @@ class DGD(nn.Module):
             device=self.device,
             save_dir=self._save_dir,
             developer_mode=developer_mode,
+            update_covariance_prior=update_covariance_prior
         )
 
         self.trained_status[0] = 1

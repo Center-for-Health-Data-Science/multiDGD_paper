@@ -275,6 +275,7 @@ class NB_Layer(nn.Module):
     def log_prob(self,model_output,target,scaling_factor,gene_id=None,mask=None):
         # the model output represents the mean normalized count
         # the scaling factor is the used normalization
+        """
         if gene_id is not None:
             logprob = logNBdensity(target[:,gene_id],self.rescale(scaling_factor,model_output)[:,gene_id],(torch.exp(self.log_r)+1)[0,gene_id])
         else:
@@ -282,6 +283,19 @@ class NB_Layer(nn.Module):
         if mask is not None:
             logprob[mask,:] = 0 # mask must be a boolean 1D tensor
         return logprob# - self.norm_abs_error(model_output,target,scaling_factor,gene_id,mask)
+        """
+        if mask is not None:
+            # here I need True for where we have the data and False for where we have the mask
+            if gene_id is not None:
+                logprob = logNBdensity(target[mask,gene_id],self.rescale(scaling_factor,model_output)[mask,gene_id],(torch.exp(self.log_r)+1)[0,gene_id])
+            else:
+                logprob = logNBdensity(target[mask,:],self.rescale(scaling_factor,model_output)[mask,:],(torch.exp(self.log_r)+1))
+        else:
+            if gene_id is not None:
+                logprob = logNBdensity(target[:,gene_id],self.rescale(scaling_factor,model_output)[:,gene_id],(torch.exp(self.log_r)+1)[0,gene_id])
+            else:
+                logprob = logNBdensity(target,self.rescale(scaling_factor,model_output),(torch.exp(self.log_r)+1))
+        return logprob
     
     def norm_abs_error(self,model_output,target,scaling_factor,gene_id=None,mask=None):
         if gene_id is not None:

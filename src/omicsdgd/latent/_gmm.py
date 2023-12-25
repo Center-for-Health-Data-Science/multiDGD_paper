@@ -206,7 +206,7 @@ class GaussianMixture(nn.Module):
         # weights are initialized uniformly so that components start out equi-probable
         self.weight = nn.Parameter(torch.ones(self.n_mix_comp),requires_grad=True)
 
-    def forward(self,x):
+    def forward(self,x,cov_prior=True):
         '''
         Forward pass computes the negative log density 
         of the probability of z being drawn from the mixture model
@@ -222,11 +222,11 @@ class GaussianMixture(nn.Module):
         # For each component multiply by mixture probs
         y = y + torch.log_softmax(self.weight,dim=0)
         y = torch.logsumexp(y, dim=-1)
-        y = y + self._prior_log_prob() # += gives cuda error
+        y = y + self._prior_log_prob(cov_prior) # += gives cuda error
 
         return (-y) # returning negative log probability density
     
-    def _prior_log_prob(self):
+    def _prior_log_prob(self, cov_prior=True):
         ''' Calculate log prob of prior on mean, neglogvar, and mixture coefficients '''
         # Mixture weights
         p = self._dirichlet_constant
@@ -235,8 +235,9 @@ class GaussianMixture(nn.Module):
         # Means
         p = p+self._mean_prior.log_prob(self.mean).sum()
         # neglogvar
-        if self._neglogvar_prior is not None:
-            p =  p+self._neglogvar_prior.log_prob(self.neglogvar).sum()
+        if cov_prior:
+            if self._neglogvar_prior is not None:
+                p =  p+self._neglogvar_prior.log_prob(self.neglogvar).sum()
         return p
     
     def log_prob(self,x):
@@ -255,6 +256,19 @@ class GaussianMixture(nn.Module):
     @property
     def stddev(self):
         return torch.sqrt(self.covariance)
+    
+    @property
+    def softmax_weight(self):
+        return torch.softmax(self.weight,dim=-1)
+    
+    @property
+    def n_components_used(self):
+        """Estimates how many components are practically used (i.e. have a weight > 0.01)"""
+        return torch.sum(self.softmax_weight > 0.01).item()
+    
+    def update_covariance_prior(self, softball_scale=2):
+        mean = round((2 * softball_scale) / (10 * self.n_components_used), 2)
+        self._neglogvar_prior = gaussian(self._neglogvar_dim,-2*math.log(mean),1)
 
     def _Distribution(self):
         '''create a distribution from mixture model (for sampling)'''

@@ -66,6 +66,7 @@ class omicsDataset(Dataset):
 
         # get modality name(s), position(s) at which modalities switch in full tensor, and number of features in each modality
         self.modalities, self.modality_switch, self.modality_features = self._get_modality_names(data,modalities,switch)
+        print("check: modality names are ", self.modalities)
 
         # added support for mosaic data
         # if there is no data.obs['modality'] column, then we assume that the data is unimodal or only paired
@@ -77,8 +78,9 @@ class omicsDataset(Dataset):
             # if the train set is mosaic, we use 10% of the paired data to minimize distances between modalities
             # for this we need to copy those samples, add them with each modality option (paired, GEX, ATAC)
             # and structure them in such a way that we can use the representation distances in the loss
-            data, data_triangle, self.modality_mask, self.modality_mask_triangle, self.mosaic_train_idx = self._make_mosaic_train_set(data)
-            self.data_triangle = torch.Tensor(data_triangle.X.todense())
+            #data, data_triangle, self.modality_mask, self.modality_mask_triangle, self.mosaic_train_idx = self._make_mosaic_train_set(data)
+            self.modality_mask = self._get_mosaic_mask(data)
+            #self.data_triangle = torch.Tensor(data_triangle.X.todense())
         elif self.mosaic and label == 'test':
             self.modality_mask = self._get_mosaic_mask(data)
 
@@ -306,8 +308,10 @@ class omicsDataset(Dataset):
             if 'modality' in data.obs.columns:
                 if data.obs['modality'].nunique() > 1:
                     mosaic = True
+                    print('mosaic data detected')
         return mosaic
     
+    """
     def _get_mosaic_mask(self, data):
         '''Return a list of tensors that indicate which samples belong to which modality'''
         if self.mosaic:
@@ -341,15 +345,34 @@ class omicsDataset(Dataset):
             #mask = np.ones(data.shape[0], dtype=bool)
             #mask[idx_split] = False
             #data_2 = data.copy()[mask,:]
-            """
-            data = data_1.concatenate(data_2)
-            idx = torch.Tensor(np.arange(n_split)).byte()#.int()
-            return data, self._get_mosaic_mask(data), idx
-            """
             idx = torch.Tensor(np.arange(n_split)).byte()
             return data, data_1, self._get_mosaic_mask(data), self._get_mosaic_mask(data_1), idx
         else:
             return data, None, self._get_mosaic_mask(data), None, None
+    """
+
+    def _get_mosaic_mask(self, data):
+        '''Return a list of tensors that indicate which samples belong to which modality'''
+        if self.mosaic:
+            print("prepping the mosaic mask")
+            modality_list = data.obs['modality']
+            modality_mask = [torch.ones((data.shape[0])).bool(), torch.ones((data.shape[0])).bool()]
+            # return an error if the modalities are not in the order we expect (later)
+            if self.modalities[0] not in ['rna', 'RNA', 'GEX', 'expression']:
+                raise ValueError('first modality is not RNA. please make RNA the first and ATAC the second modality')
+            mod_name_1 = self.modalities[0]
+            mod_name_2 = self.modalities[1]
+            modality_mask[0][modality_list == mod_name_2] = False
+            modality_mask[1][modality_list == mod_name_1] = False
+            # make a test dataframe to check correctness
+            import pandas as pd
+            df_test = pd.DataFrame({
+                'modality': modality_list,
+                'rna': modality_mask[0].numpy(),
+                'atac': modality_mask[1].numpy()
+            })
+            print(df_test)
+        return modality_mask
     
     def get_mask(self, indices):
         if self.modality_mask is None:
