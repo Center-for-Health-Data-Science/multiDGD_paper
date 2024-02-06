@@ -285,8 +285,8 @@ def train_dgd(
         #reconstruction_loss[-1] /= n_samples
         #distribution_loss[-1] /= n_samples
             
-        #if update_covariance_prior:
-        #    gmm.update_covariance_prior()
+        if update_covariance_prior:
+            gmm.update_covariance_prior()
         
         if not developer_mode:
             progress_bar.set_postfix(loss=total_loss[-1]/(train_loader.dataset.n_features*n_samples), reconstruction_loss=reconstruction_loss[-1]/(train_loader.dataset.n_features*n_samples))

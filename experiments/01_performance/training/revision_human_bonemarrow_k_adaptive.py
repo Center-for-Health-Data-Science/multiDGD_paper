@@ -50,7 +50,7 @@ model = DGD(
     meta_label="cell_type",
     correction="Site",
     save_dir="../results/trained_models/" + data_name + "/",
-    model_name=data_name + "_l20_h2-3_rs" + str(random_seed)+"_ncomp50_adaptive_noCovPrior",
+    model_name=data_name + "_l20_h2-3_rs" + str(random_seed)+"_ncomp50_adaptive_noCovPrior_2",
     #model_name=data_name + "_l20_h2-3_rs" + str(random_seed)+"_ncomp22_control",
     random_seed=random_seed,
 )
