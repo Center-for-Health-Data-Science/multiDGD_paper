@@ -68,7 +68,7 @@ def get_close_peaks_effect(atac_delta_adata: ad.AnnData, gene_ranges_df: pd.Data
     close_peaks_df['mean_delta'] =  np.abs(atac_delta_adata[:, close_peaks_df.name].X).mean(0).toarray()
     close_peaks_df['se_delta'] = np.abs(atac_delta_adata[:, close_peaks_df.name].X).std(0).toarray() / np.sqrt(close_peaks_df.shape[0])
     close_peaks_df['perturbed_gene'] = perturbed_gene
-    close_peaks_df.to_csv(model_dir + f'TSS_perturb_experiment.{perturbed_gene}.csv')
+    return(close_peaks_df)
     
 # Read data
 data = ad.read_h5ad(model_dir + 'GSE194122_openproblems_neurips2021_multiome_BMMC_processed_withDataSplit.h5ad')
@@ -98,10 +98,17 @@ except KeyError:
 ## Run gene perturbation and save
 all_close_peaks_df = pd.DataFrame()
 for g in all_genes:
-    if not os.path.exists(model_dir + f'TSS_perturb_experiment.{g}.csv'):
+    if not os.path.exists(model_dir + f'TSS_perturb_experiment_with_ctrl.{g}.csv'):
         predicted_changes, samples_of_interest = model.gene2peak(gene_name=g, testset=testset)
         delta_gex = predicted_changes[0]
         delta_atac = predicted_changes[1]
 
         atac_delta_adata = ad.AnnData(X = delta_atac.numpy(), obs = testset[samples_of_interest].obs, var=var_atac)
-        get_close_peaks_effect(atac_delta_adata, gene_ranges_df, g)
+        close_peaks_df = get_close_peaks_effect(atac_delta_adata, gene_ranges_df, g)
+        close_peaks_df['set'] = 'true'
+        all_close_peaks_df = pd.concat([all_close_peaks_df, close_peaks_df])
+        # add negative control (TSS around another gene)
+        close_peaks_df = get_close_peaks_effect(atac_delta_adata, gene_ranges_df, np.random.choice(all_genes))
+        close_peaks_df['set'] = 'neg_control'
+        all_close_peaks_df = pd.concat([all_close_peaks_df, close_peaks_df])
+        all_close_peaks_df.to_csv(model_dir + f'TSS_perturb_experiment_with_ctrl.{g}.csv')
