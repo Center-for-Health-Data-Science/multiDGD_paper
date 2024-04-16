@@ -17,7 +17,8 @@ from omicsdgd.functions._analysis import discrete_kullback_leibler
 # define model names, directory and batches
 #####################
 save_dir = "../results/trained_models/"
-analysis_dir = "../results/revision/analysis/"
+analysis_dir = "../results/analysis/"
+plot_dir = "../results/revision/"
 data_name = "human_bonemarrow"
 model_names = [
     "human_bonemarrow_l20_h2-3_leftout_site1",
@@ -38,11 +39,11 @@ batches_left_out = ["site1", "site2", "site3", "site4"]
 # set up figure
 #####################
 #####################
-figure_height = 18
+figure_height = 9
 cm = 1 / 2.54
 fig = plt.figure(figsize=(18 * cm, figure_height * cm))
-n_cols = 12
-n_rows = 7
+n_cols = 11
+n_rows = 4
 gs = gridspec.GridSpec(n_rows, n_cols)
 gs.update(wspace=0.6, hspace=8.0)
 ax_list = []
@@ -303,6 +304,19 @@ ax_list[-1].text(
     fontweight=grid_letter_fontweight,
 )
 
+"""
+ax_list[-1].text(
+    grid_letter_positions[0] + 0.745,
+    1.3 + grid_letter_positions[1],
+    "Integrating novel batches",
+    transform=ax_list[-1].transAxes + trans,
+    fontsize=grid_letter_fontsize,
+    va="bottom",
+    fontfamily=grid_letter_fontfamily,
+    fontweight=grid_letter_fontweight,
+)
+"""
+
 ax_list[-1].axhline(1.0, color="gray", linestyle="--", linewidth=line_width * 2)
 sns.violinplot(
     data=df_error_ratios[df_error_ratios["model"] == "multiDGD"],
@@ -365,6 +379,9 @@ for i in range(len(dkl_annot)):
 metrics_df = pd.read_csv(
     analysis_dir + "batch_integration/human_bonemarrow_reconstruction_performance.csv"
 )
+metrics_df2 = pd.read_csv(
+    analysis_dir + "batch_integration/human_bonemarrow_reconstruction_performance_revision.csv"
+)
 df_batch_effect = pd.read_csv(
     analysis_dir + "batch_integration/human_bonemarrow_batch_effect.csv"
 )
@@ -372,6 +389,8 @@ df_batch_effect["1 - ASW"] = 1 - df_batch_effect["ASW"]
 df_batch_effect["(1 - ASW) ratio"] = (
     df_batch_effect["1 - ASW"] / df_batch_effect["1 - ASW"].values[0]
 )
+df_batch_effect["AUPRC"] = 0.279039
+df_batch_effect["AUPRC"][1:] = metrics_df2["AUPRC"].values
 df_batch_effect_2 = pd.read_csv(
     analysis_dir + "batch_integration/human_bonemarrow_batch_effect_mvi.csv"
 )
@@ -379,6 +398,10 @@ df_batch_effect_2["1 - ASW"] = 1 - df_batch_effect_2["ASW"]
 df_batch_effect_2["(1 - ASW) ratio"] = (
     df_batch_effect_2["1 - ASW"] / df_batch_effect_2["1 - ASW"].values[0]
 )
+print(df_batch_effect_2)
+# these values are taken from the mvi_performance notebook and are in order with the models
+#0.258541
+df_batch_effect_2["AUPRC"] = [0.26081529699812717, 0.25975587259993305, 0.25924887119849777, 0.25766518018835755, 0.25905025997182063]
 df_batch_effect = pd.concat([df_batch_effect, df_batch_effect_2], axis=0)
 df_batch_effect["test error ratio"] = get_average_metric(
     df_batch_effect, df_error_ratios, "error_ratio"
@@ -506,15 +529,13 @@ ax_list[-1].set_title("Reconstruction\nperformance (RNA) \u2193")
 
 # balanced accuracy
 ax_list.append(plt.subplot(gs[2:4, 4:7]))
-metric = "balanced accuracy"
+#metric = "balanced accuracy"
+metric = "AUPRC"
 ax_list[-1].axhline(
-    0.6960756182670593,
-    color=palette_models[0],
-    linestyle="--",
-    linewidth=line_width * 2,
+    0.258541, color=palette_models[0], linestyle="--", linewidth=line_width * 2
 )
 ax_list[-1].axhline(
-    0.765972375869751, color=palette_models[1], linestyle="--", linewidth=line_width * 2
+    0.279039, color=palette_models[1], linestyle="--", linewidth=line_width * 2
 )
 sns.boxplot(
     data=df_batch_effect[df_batch_effect["batch"] != "none"],
@@ -542,7 +563,7 @@ ax_list[-1].legend(
     handletextpad=handletextpad * 4,
     ncol=1,
 ).set_visible(False)
-ax_list[-1].set_ylabel("Balanced accuracy")
+ax_list[-1].set_ylabel("AUPRC")
 ax_list[-1].set_title("Reconstruction\nperformance (ATAC) \u2191")
 
 # batch effect removal
@@ -592,269 +613,8 @@ ax_list[-1].legend(
 ).set_visible(False)
 ax_list[-1].set_title("Batch effect removal \u2191")
 
-#####################
-# C
-# Example embeddings of DGD
-#####################
 
-# change this to show site4 DGD next to MultiVI
-
-# df_batch_effect = df_batch_effect[df_batch_effect["model"] == "multiDGD"]
-
-###
-# prepare umaps
-###
-column_names = ["UMAP D1", "UMAP D2"]
-if not os.path.exists(analysis_dir + "batch_integration/bonemarrow_umap_batches.csv"):
-    # is_train_df = pd.read_csv("data/" + data_name + "/train_val_test_split.csv")
-    # trainset, testset, modality_switch, library = load_testdata_as_anndata(data_name)
-    import anndata as ad
-
-    data_name = "human_bonemarrow"
-    adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
-    adata.X = adata.layers["counts"]
-    train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
-    test_indices = list(np.where(adata.obs["train_val_test"] == "test")[0])
-    trainset = adata[train_indices, :].copy()
-    testset = adata[test_indices, :].copy()
-
-    batch_labels = testset.obs["Site"].values
-    for count, model_name in enumerate(model_names):
-        print(model_name)
-        train_indices = [
-            x
-            for x in np.arange(len(trainset))
-            if trainset.obs["Site"].values[x] != batches_left_out[count]
-        ]
-        model = DGD.load(
-            data=trainset[train_indices],
-            save_dir=save_dir + data_name + "/",
-            model_name=model_name,
-        )
-        # get latent spaces in reduced dimensionality
-        rep = model.representation.z.detach().numpy()
-        test_rep = model.test_rep.z.detach().numpy()
-        model = None
-
-        # make umap
-        n_neighbors = 50
-        min_dist = 0.75
-        reducer = umap.UMAP(n_neighbors=n_neighbors, n_components=2, min_dist=min_dist)
-        projected = reducer.fit_transform(rep)
-        plot_data = pd.DataFrame(projected, columns=column_names)
-        plot_data["batch"] = "train"
-        plot_data["data set"] = "train"
-        projected_test = reducer.transform(test_rep)
-        plot_data_test = pd.DataFrame(projected_test, columns=column_names)
-        plot_data_test["batch"] = batch_labels
-        plot_data_test["batch"] = [
-            x if x == batches_left_out[count] else "test seen"
-            for x in plot_data_test["batch"].values
-        ]
-        plot_data_test["data set"] = "test"
-        plot_data = pd.concat([plot_data, plot_data_test], axis=0)
-        plot_data["batch"] = plot_data["batch"].astype("category")
-        plot_data["batch"].cat.set_categories(
-            ["train", "test seen", "site1", "site2", "site3", "site4"], inplace=True
-        )
-        plot_data["data set"] = plot_data["batch"].astype("category")
-        plot_data["data set"].cat.set_categories(["train", "test"], inplace=True)
-        plot_data["model"] = batches_left_out[count]
-        print(plot_data.head())
-        if count == 0:
-            umap_data = plot_data
-        else:
-            umap_data = pd.concat([umap_data, plot_data], axis=0)
-        # save files
-    umap_data.to_csv(
-        analysis_dir + "batch_integration/bonemarrow_umap_batches.csv", index=False
-    )
-else:
-    umap_data = pd.read_csv(
-        analysis_dir + "batch_integration/bonemarrow_umap_batches.csv"
-    )
-    umap_data["batch"] = umap_data["batch"].astype("category")
-    umap_data["batch"].cat.set_categories(
-        ["train", "test seen", "site1", "site2", "site3", "site4"], inplace=True
-    )
-    umap_data["data set"] = umap_data["batch"].astype("category")
-    umap_data["data set"].cat.set_categories(["train", "test"], inplace=True)
-# MVI
-if not os.path.exists(
-    analysis_dir + "batch_integration/mvi_bonemarrow_umap_batches.csv"
-):
-    import scvi
-
-    # is_train_df = pd.read_csv("data/" + data_name + "/train_val_test_split.csv")
-    # trainset, testset, modality_switch, library = load_testdata_as_anndata(data_name)
-    import anndata as ad
-
-    data_name = "human_bonemarrow"
-    adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
-    adata.X = adata.layers["counts"]
-    train_indices = list(np.where(adata.obs["train_val_test"] == "train")[0])
-    test_indices = list(np.where(adata.obs["train_val_test"] == "test")[0])
-    trainset = adata[train_indices, :].copy()
-    testset = adata[test_indices, :].copy()
-
-    batch_labels = testset.obs["Site"].values
-    trainset.obs["modality"] = "paired"
-    trainset.X = trainset.layers["counts"]
-    testset.obs["modality"] = "paired"
-    testset.X = testset.layers["counts"]
-    trainset.var_names_make_unique()
-    testset.var_names_make_unique()
-    scvi.model.MULTIVI.setup_anndata(trainset, batch_key="Site")
-    scvi.model.MULTIVI.setup_anndata(testset, batch_key="Site")
-    for count, model_name in enumerate(mvi_names):
-        print(model_name)
-        train_indices = [
-            x
-            for x in np.arange(len(trainset))
-            if trainset.obs["Site"].values[x] != batches_left_out[count]
-        ]
-        model = scvi.model.MULTIVI.load(
-            save_dir + "multiVI/" + data_name + "/" + model_name, adata=trainset
-        )
-        rep = model.get_latent_representation()
-        test_rep = model.get_latent_representation(testset)
-        model = None
-
-        # make umap
-        n_neighbors = 50
-        min_dist = 0.5
-        reducer = umap.UMAP(n_neighbors=n_neighbors, n_components=2, min_dist=min_dist)
-        projected = reducer.fit_transform(rep)
-        plot_data = pd.DataFrame(projected, columns=column_names)
-        plot_data["batch"] = "train"
-        plot_data["data set"] = "train"
-        projected_test = reducer.transform(test_rep)
-        plot_data_test = pd.DataFrame(projected_test, columns=column_names)
-        plot_data_test["batch"] = batch_labels
-        plot_data_test["batch"] = [
-            x if x == batches_left_out[count] else "test seen"
-            for x in plot_data_test["batch"].values
-        ]
-        plot_data_test["data set"] = "test"
-        plot_data = pd.concat([plot_data, plot_data_test], axis=0)
-        plot_data["batch"] = plot_data["batch"].astype("category")
-        plot_data["batch"].cat.set_categories(
-            ["train", "test seen", "site1", "site2", "site3", "site4"], inplace=True
-        )
-        plot_data["data set"] = plot_data["batch"].astype("category")
-        plot_data["data set"].cat.set_categories(["train", "test"], inplace=True)
-        plot_data["model"] = batches_left_out[count]
-        print(plot_data.head())
-        if count == 0:
-            umap_data_2 = plot_data
-        else:
-            umap_data_2 = pd.concat([umap_data_2, plot_data], axis=0)
-        # save files
-    umap_data_2.to_csv(
-        analysis_dir + "batch_integration/mvi_bonemarrow_umap_batches.csv", index=False
-    )
-else:
-    umap_data_2 = pd.read_csv(
-        analysis_dir + "batch_integration/mvi_bonemarrow_umap_batches.csv"
-    )
-    umap_data_2["batch"] = umap_data_2["batch"].astype("category")
-    umap_data_2["batch"].cat.set_categories(
-        ["train", "test seen", "site1", "site2", "site3", "site4"], inplace=True
-    )
-    umap_data_2["data set"] = umap_data_2["batch"].astype("category")
-    umap_data_2["data set"].cat.set_categories(["train", "test"], inplace=True)
-
-###
-# plots
-###
-site = "site4"
-ax_list.append(plt.subplot(gs[4:, 0:5]))
-ax_list[-1].text(
-    grid_letter_positions[0] - 0.02,
-    1.0 + grid_letter_positions[1],
-    "D",
-    transform=ax_list[-1].transAxes + trans,
-    fontsize=grid_letter_fontsize,
-    va="bottom",
-    fontfamily=grid_letter_fontfamily,
-    fontweight=grid_letter_fontweight,
-)
-sns.scatterplot(
-    data=umap_data[umap_data["model"] == site].sort_values(by="batch"),
-    x=column_names[0],
-    y=column_names[1],
-    hue="batch",
-    palette=palette_3colrs,
-    ax=ax_list[-1],
-    s=point_size,
-)
-ax_list[-1].set_title(
-    site
-    + " integration multiDGD"
-    + "\n(1-ASW = "
-    + str(
-        round(
-            df_batch_effect[
-                (df_batch_effect["model"] == "multiDGD")
-                & (df_batch_effect["batch"] == site)
-            ]["1 - ASW"].item(),
-            4,
-        )
-    )
-    + ")"
-)
-# use only the first, second and last legend entries
-handles, labels = ax_list[-1].get_legend_handles_labels()
-ax_list[-1].legend(
-    handles=[handles[0], handles[1], handles[-1]],
-    labels=[labels[0], labels[1], labels[-1]],
-    bbox_to_anchor=(0.75, -0.1),
-    loc="upper left",
-    frameon=False,
-    handletextpad=handletextpad,
-    ncol=6,
-)  # .set_visible(False)
-ax_list[-1].set_xticklabels([])
-ax_list[-1].set_yticklabels([])
-ax_list[-1].tick_params(
-    axis="both", which="both", bottom=False, top=False, left=False, right=False
-)
-
-# remove the duplicates in umap_data_2
-# umap_data_2 = umap_data.drop_duplicates()
-
-ax_list.append(plt.subplot(gs[4:, 6:11]))
-sns.scatterplot(
-    data=umap_data_2[umap_data_2["model"] == site].sort_values(by="batch"),
-    x=column_names[0],
-    y=column_names[1],
-    hue="batch",
-    palette=palette_3colrs,
-    ax=ax_list[-1],
-    s=point_size,
-)
-ax_list[-1].set_title(
-    site
-    + " integration MultiVI + scArches"
-    + "\n(1-ASW = "
-    + str(
-        round(
-            df_batch_effect[
-                (df_batch_effect["model"] != "multiDGD")
-                & (df_batch_effect["batch"] == site)
-            ]["1 - ASW"].item(),
-            4,
-        )
-    )
-    + ")"
-)
-ax_list[-1].legend().set_visible(False)
-ax_list[-1].set_xticklabels([])
-ax_list[-1].set_yticklabels([])
-ax_list[-1].tick_params(
-    axis="both", which="both", bottom=False, top=False, left=False, right=False
-)
 
 plt.savefig(
-    analysis_dir + "plots/fig3_v2.png", dpi=720, bbox_inches="tight"
+    plot_dir + "plots/main/fig3_revision.png", dpi=720, bbox_inches="tight"
 )

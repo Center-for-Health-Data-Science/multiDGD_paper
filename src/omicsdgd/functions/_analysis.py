@@ -4,7 +4,7 @@ import seaborn as sns
 import numpy as np
 from sklearn import preprocessing
 import torch
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, average_precision_score
 
 from omicsdgd import DGD
 from omicsdgd.latent import GaussianMixture
@@ -288,9 +288,114 @@ def binarize(x, threshold=0.5):
     x[x < threshold] = 0
     return x
 
-def classify_binary_output(target, mod, scaling_factor, switch, threshold, batch_size=5000, feature_indices=None):
+# function to get the model predictions for ATAC
+
+from sklearn.metrics import average_precision_score
+from scipy.stats import spearmanr
+
+def alternative_ATAC_metrics(mod, target, switch, scaling_factor, batch_size=100, axis=0, scale=True, print_out=False):
+    n_samples = target.shape[0]
+    x_accessibility = torch.Tensor(target.X[:,switch:].todense())
+    y_accessibility = torch.zeros((n_samples, target.shape[1]-switch))
+
+    for i in range(int(n_samples/batch_size)+1):
+        if print_out:
+            print(round(i/(int(n_samples/batch_size))*100),'%')
+        start = i*batch_size
+        end = min((i+1)*batch_size,n_samples)
+        indices = np.arange(start,end,1)
+        y_accessibility_temp = mod.get_accessibility_estimates(target, indices=indices)
+        if type(y_accessibility_temp) is not torch.Tensor:
+            if type(y_accessibility_temp) == pd.core.frame.DataFrame:
+                y_accessibility_temp = torch.from_numpy(y_accessibility_temp.values)
+        y_accessibility[indices,:] = y_accessibility_temp.detach().cpu()
+    
+    if scale:
+        y_accessibility = y_accessibility * scaling_factor
+    
+    # axis 0 is sample-wise, axis 1 feature-wise
+    if axis is not None:
+        y_auprc = np.zeros(y_accessibility.shape[axis])
+        y_spearmanr = np.zeros(y_accessibility.shape[axis])
+        if axis == 0:
+            for j in range(y_accessibility.shape[axis]):
+                # AUPRC
+                true_labels = x_accessibility[j,:].detach().cpu()
+                binary_labels = binarize(true_labels).numpy().astype(int)
+                predicted = y_accessibility[j,:].numpy()
+                y_auprc[j] = average_precision_score(binary_labels, predicted)
+                y_spearmanr[j], _ = spearmanr(true_labels, predicted)
+        else:
+            for j in range(y_accessibility.shape[axis]):
+                # AUPRC
+                true_labels = x_accessibility[:,j].detach().cpu()
+                binary_labels = binarize(true_labels).numpy().astype(int)
+                predicted = y_accessibility[:,j].numpy()
+                y_auprc[j] = average_precision_score(binary_labels, predicted)
+                y_spearmanr[j], _ = spearmanr(true_labels, predicted)
+    else:
+        true_labels = x_accessibility.detach().cpu().numpy().flatten()
+        binary_labels = binarize(true_labels).astype(int)
+        predicted = y_accessibility.detach().cpu().numpy().flatten()
+        y_auprc = average_precision_score(binary_labels, predicted)
+        y_spearmanr, _ = spearmanr(true_labels[::10], predicted[::10])
+    
+
+    return y_auprc, y_spearmanr
+
+def spearman_corr(mod, target, switch, scaling_factor, batch_size=100, axis=0, scale=True, print_out=False, mod_id=0):
+    n_samples = target.shape[0]
+    if mod_id == 0:
+        x_accessibility = torch.Tensor(target.X[:,:switch].todense())
+        y_accessibility = torch.zeros((n_samples, switch))
+    elif mod_id == 1:
+        x_accessibility = torch.Tensor(target.X[:,switch:].todense())
+        y_accessibility = torch.zeros((n_samples, target.shape[1]-switch))
+
+    for i in range(int(n_samples/batch_size)+1):
+        if print_out:
+            print(round(i/(int(n_samples/batch_size))*100),'%')
+        start = i*batch_size
+        end = min((i+1)*batch_size,n_samples)
+        indices = np.arange(start,end,1)
+        if mod_id == 0:
+            y_accessibility_temp = mod.get_normalized_expression(target, indices=indices)
+        elif mod_id == 1:
+            y_accessibility_temp = mod.get_accessibility_estimates(target, indices=indices)
+        if type(y_accessibility_temp) is not torch.Tensor:
+            if type(y_accessibility_temp) == pd.core.frame.DataFrame:
+                y_accessibility_temp = torch.from_numpy(y_accessibility_temp.values)
+        y_accessibility[indices,:] = y_accessibility_temp.detach().cpu()
+    
+    if scale:
+        y_accessibility = y_accessibility * scaling_factor
+    
+    # axis 0 is sample-wise, axis 1 feature-wise
+    if axis is not None:
+        y_spearmanr = np.zeros(y_accessibility.shape[axis])
+        if axis == 0:
+            for j in range(y_accessibility.shape[axis]):
+                # AUPRC
+                true_labels = x_accessibility[j,:].detach().cpu()
+                predicted = y_accessibility[j,:].numpy()
+                y_spearmanr[j], _ = spearmanr(true_labels, predicted)
+        else:
+            for j in range(y_accessibility.shape[axis]):
+                # AUPRC
+                true_labels = x_accessibility[:,j].detach().cpu()
+                predicted = y_accessibility[:,j].numpy()
+                y_spearmanr[j], _ = spearmanr(true_labels, predicted)
+    else:
+        true_labels = x_accessibility.detach().cpu().numpy().flatten()
+        predicted = y_accessibility.detach().cpu().numpy().flatten()
+        y_spearmanr, _ = spearmanr(true_labels, predicted)
+
+    return y_spearmanr
+
+def classify_binary_output(target, mod, scaling_factor, switch, threshold, batch_size=5000, feature_indices=None, print_out=False):
     '''calculating true positives, false positives, true negatives and false negatives'''
-    print('classifying binary output')
+    if print_out:
+        print('classifying binary output')
     
     n_samples = target.shape[0]
     true_positives = torch.zeros((n_samples))
@@ -299,7 +404,8 @@ def classify_binary_output(target, mod, scaling_factor, switch, threshold, batch
     false_negatives = torch.zeros((n_samples))
     
     for i in range(int(n_samples/batch_size)+1):
-        print(round(i/(int(n_samples/batch_size))*100),'%')
+        if print_out:
+            print(round(i/(int(n_samples/batch_size))*100),'%')
         start = i*batch_size
         end = min((i+1)*batch_size,n_samples)
         indices = np.arange(start,end,1)
@@ -324,20 +430,31 @@ def classify_binary_output(target, mod, scaling_factor, switch, threshold, batch
     
     return true_positives, false_positives, true_negatives, false_negatives
 
-def classify_binary_output_feature(target, mod, scaling_factor, switch, threshold, batch_size=5000, feature_indices=None):
+def classify_binary_output_feature(target, mod, scaling_factor, switch, threshold, batch_size=5000, feature_indices=None, print_out=False):
     '''calculating true positives, false positives, true negatives and false negatives'''
-    print('classifying binary output')
+    if print_out:
+        print('classifying binary output')
     
-    #n_features = target.shape[1]
-    
+    n_samples = target.shape[0]
     x_accessibility = binarize(torch.Tensor(target.X[:,switch:].todense())).int()
-    y_accessibility = mod.get_accessibility_estimates(target, indices=None)
-    if type(y_accessibility) is not torch.Tensor:
-        if type(y_accessibility) == pd.core.frame.DataFrame:
-            y_accessibility = torch.from_numpy(y_accessibility.values)
-            y_accessibility = y_accessibility.detach().cpu()
-    else:
-        y_accessibility = y_accessibility.detach().cpu()*scaling_factor
+    y_accessibility = torch.zeros((n_samples, target.shape[1]-switch))
+
+    for i in range(int(n_samples/batch_size)+1):
+        if print_out:
+            print(round(i/(int(n_samples/batch_size))*100),'%')
+        start = i*batch_size
+        end = min((i+1)*batch_size,n_samples)
+        indices = np.arange(start,end,1)
+        y_accessibility_temp = mod.get_accessibility_estimates(target, indices=indices)
+        if type(y_accessibility_temp) is not torch.Tensor:
+            if type(y_accessibility_temp) == pd.core.frame.DataFrame:
+                y_accessibility_temp = torch.from_numpy(y_accessibility_temp.values)
+        y_accessibility[indices,:] = y_accessibility_temp.detach().cpu()
+    
+    print("checking feature BA")
+    print(y_accessibility.shape)
+    print(scaling_factor.shape)
+    y_accessibility = y_accessibility*scaling_factor
     y_accessibility = binarize(y_accessibility, threshold).int()
     if feature_indices is not None:
         x_accessibility = x_accessibility[:,feature_indices]
@@ -351,12 +468,12 @@ def classify_binary_output_feature(target, mod, scaling_factor, switch, threshol
     
     return true_positives, false_positives, true_negatives, false_negatives
 
-def binary_output_scores(target, mod, scaling_factor, switch, threshold, batch_size=5000, feature_indices=None, reduction="sample", return_se=False, return_all=False):
+def binary_output_scores(target, mod, scaling_factor, switch, threshold, batch_size=5000, feature_indices=None, reduction="sample", return_se=False, return_all=False, print_out=False):
     '''returns FPR, FNR, balanced accuracy, LR+ and LR-'''
     if reduction == "sample":
-        tp, fp, tn, fn = classify_binary_output(target, mod, scaling_factor, switch, threshold, batch_size, feature_indices)
+        tp, fp, tn, fn = classify_binary_output(target, mod, scaling_factor, switch, threshold, batch_size, feature_indices, print_out=print_out)
     elif reduction == "feature":
-        tp, fp, tn, fn = classify_binary_output_feature(target, mod, scaling_factor, switch, threshold, batch_size, feature_indices)
+        tp, fp, tn, fn = classify_binary_output_feature(target, mod, scaling_factor, switch, threshold, batch_size, feature_indices, print_out=print_out)
     else:
         raise ValueError('incorrect reduction submitted. Can only be `sample` or `feature`.')
     if not return_all:
@@ -427,6 +544,93 @@ def compute_error_per_feature(target, output, reduction_type='ms'):
     else:
         raise ValueError('invalid reduction type given. Can only be `ms` or `ma`.')
 
+def compute_count_error(target, mod, scaling_factor, switch, batch_size=5000, error_type='rmse', feature_indices=None, reduction="sample", return_se=False, mod_id=0):
+    '''computes expression error for target (given as anndata object)'''
+    
+    if mod_id not in [0,1]:
+        raise ValueError('incorrect mod_id submitted. Can only be 0 or 1.')
+    
+    if reduction == "sample":
+        n_samples = target.shape[0]
+        errors = torch.zeros((n_samples))
+        for i in range(int(n_samples/batch_size)+1):
+            print('   ',round(i/(int(n_samples/batch_size))*100),'%')
+            start = i*batch_size
+            end = min((i+1)*batch_size,n_samples)
+            indices = np.arange(start,end,1)
+            #target.n_vars = switch # because of multivi
+            if mod_id == 0:
+                y_expression = mod.get_normalized_expression(target, indices=indices)
+            elif mod_id == 1:
+                y_expression = mod.get_normalized_accessibility(target, indices=indices)
+            if type(y_expression) is not torch.Tensor:
+                if type(y_expression) == pd.core.frame.DataFrame:
+                    y_expression = torch.from_numpy(y_expression.values)
+            else:
+                y_expression = y_expression.detach().cpu()
+            y_expression *= scaling_factor[indices]
+            if feature_indices is not None:
+                y_expression = y_expression[:,feature_indices]
+                if mod_id == 0:
+                    x_expression = torch.Tensor(target.X[indices,:switch].todense())[:,feature_indices]
+                elif mod_id == 1:
+                    x_expression = binarize(torch.Tensor(target.X[indices,switch:].todense())[:,feature_indices])
+            else:
+                if mod_id == 0:
+                    x_expression = torch.Tensor(target.X[indices,:switch].todense())
+                elif mod_id == 1:
+                    x_expression = binarize(torch.Tensor(target.X[indices,switch:].todense()))
+            if reduction == "sample":
+                if 'rmse' in error_type:
+                    errors[indices] = compute_error_per_sample(x_expression, y_expression, reduction_type='ms')
+                elif 'mae' in error_type:
+                    errors[indices] = compute_error_per_sample(x_expression, y_expression, reduction_type='ma')
+                else:
+                    raise ValueError('incorrect error_type submitted. Can only be `rmse` or `mae`.')
+    elif reduction == "feature":
+        if mod_id == 0:
+            y_expression = mod.get_normalized_expression(target, indices=None)
+        elif mod_id == 1:
+            y_expression = mod.get_normalized_accessibility(target, indices=None)
+        if type(y_expression) is not torch.Tensor:
+            if type(y_expression) == pd.core.frame.DataFrame:
+                y_expression = torch.from_numpy(y_expression.values)
+        else:
+            y_expression = y_expression.detach().cpu()
+        y_expression *= scaling_factor
+        if feature_indices is not None:
+            y_expression = y_expression[:,feature_indices]
+            if mod_id == 0:
+                x_expression = torch.Tensor(target.X[:,:switch].todense())[:,feature_indices]
+            elif mod_id == 1:
+                x_expression = binarize(torch.Tensor(target.X[:,switch:].todense())[:,feature_indices])
+        else:
+            if mod_id == 0:
+                x_expression = torch.Tensor(target.X[:,:switch].todense())
+            elif mod_id == 1:
+                x_expression = binarize(torch.Tensor(target.X[:,switch:].todense()))
+        if 'rmse' in error_type:
+            errors = compute_error_per_feature(x_expression, y_expression, reduction_type='ms')
+        elif 'mae' in error_type:
+            errors = compute_error_per_feature(x_expression, y_expression, reduction_type='ma')
+        else:
+            raise ValueError('incorrect error_type submitted. Can only be `rmse` or `mae`.')
+    
+    # print where the 5 highest errors are
+    if return_se:
+        if error_type == 'rmse':
+            return [torch.sqrt(torch.mean(errors)).item(), (torch.sqrt(errors).std() / np.sqrt(errors.shape[0])).item()]
+        elif error_type == 'mae':
+            return [torch.mean(errors).item(), (errors.std() / np.sqrt(errors.shape[0])).item()]
+    if error_type == 'rmse':
+        out_error = torch.sqrt(torch.mean(errors))
+        return out_error.item()
+    elif error_type == 'mae':
+        out_error = torch.mean(errors)
+        return out_error.item()
+    else:
+        return errors
+
 def compute_expression_error(target, mod, scaling_factor, switch, batch_size=5000, error_type='rmse', feature_indices=None, reduction="sample", return_se=False):
     '''computes expression error for target (given as anndata object)'''
     
@@ -439,10 +643,12 @@ def compute_expression_error(target, mod, scaling_factor, switch, batch_size=500
             end = min((i+1)*batch_size,n_samples)
             indices = np.arange(start,end,1)
             #target.n_vars = switch # because of multivi
-            y_expression = mod.get_normalized_expression(target, indices=indices).detach().cpu()
+            y_expression = mod.get_normalized_expression(target, indices=indices)
             if type(y_expression) is not torch.Tensor:
                 if type(y_expression) == pd.core.frame.DataFrame:
                     y_expression = torch.from_numpy(y_expression.values)
+            else:
+                y_expression = y_expression.detach().cpu()
             y_expression *= scaling_factor[indices]
             if feature_indices is not None:
                 y_expression = y_expression[:,feature_indices]
@@ -457,10 +663,12 @@ def compute_expression_error(target, mod, scaling_factor, switch, batch_size=500
                 else:
                     raise ValueError('incorrect error_type submitted. Can only be `rmse` or `mae`.')
     elif reduction == "feature":
-        y_expression = mod.get_normalized_expression(target, indices=None).detach().cpu()
+        y_expression = mod.get_normalized_expression(target, indices=None)
         if type(y_expression) is not torch.Tensor:
             if type(y_expression) == pd.core.frame.DataFrame:
                 y_expression = torch.from_numpy(y_expression.values)
+        else:
+            y_expression = y_expression.detach().cpu()
         y_expression *= scaling_factor
         if feature_indices is not None:
             y_expression = y_expression[:,feature_indices]
@@ -683,3 +891,57 @@ def discrete_kullback_leibler(p, q):
     p = p + 1e-10
     q = q + 1e-10
     return (p * np.log(p / q)).sum()
+
+def calculate_mean_errors(test_errors, testset, modality_switch):
+    # calculate the average error per sample and modality, along with standard error
+    test_errors_rna = test_errors[:, : modality_switch].detach().cpu().numpy()
+    test_errors_atac = test_errors[:, modality_switch :].detach().cpu().numpy()
+    test_errors_rna_mean_sample = np.mean(test_errors_rna, axis=1)
+    test_errors_atac_mean_sample = np.mean(test_errors_atac, axis=1)
+    test_errors_rna_std_sample = np.std(test_errors_rna, axis=1)
+    test_errors_atac_std_sample = np.std(test_errors_atac, axis=1)
+    test_errors_rna_se_sample = test_errors_rna_std_sample / np.sqrt(test_errors_rna.shape[1])
+    test_errors_atac_se_sample = test_errors_atac_std_sample / np.sqrt(test_errors_atac.shape[1])
+    # now also gene-wise
+    test_errors_rna_mean_gene = np.mean(test_errors_rna, axis=0)
+    test_errors_atac_mean_gene = np.mean(test_errors_atac, axis=0)
+    test_errors_rna_std_gene = np.std(test_errors_rna, axis=0)
+    test_errors_atac_std_gene = np.std(test_errors_atac, axis=0)
+    test_errors_rna_se_gene = test_errors_rna_std_gene / np.sqrt(test_errors_rna.shape[0])
+    test_errors_atac_se_gene = test_errors_atac_std_gene / np.sqrt(test_errors_atac.shape[0])
+    # save the results
+    df1 = pd.DataFrame(
+        {
+            "rna_mean": test_errors_rna_mean_sample,
+            "rna_std": test_errors_rna_std_sample,
+            "rna_se": test_errors_rna_se_sample,
+            "atac_mean": test_errors_atac_mean_sample,
+            "atac_std": test_errors_atac_std_sample,
+            "atac_se": test_errors_atac_se_sample,
+            "batch": testset.obs["Site"].values,
+        }
+    )
+    df2_temp = pd.DataFrame(
+        {
+            "rna_mean": test_errors_rna_mean_gene,
+            "rna_std": test_errors_rna_std_gene,
+            "rna_se": test_errors_rna_se_gene,
+            "feature": testset.var_names[:modality_switch],
+            "modality": "rna"
+        }
+    )
+    df2 = pd.concat(
+        [
+            df2_temp,
+            pd.DataFrame(
+                {
+                    "atac_mean": test_errors_atac_mean_gene,
+                    "atac_std": test_errors_atac_std_gene,
+                    "atac_se": test_errors_atac_se_gene,
+                    "feature": testset.var_names[modality_switch:],
+                    "modality": "atac"
+                }
+            )
+        ]
+    )
+    return df1, df2

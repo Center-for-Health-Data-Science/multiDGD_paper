@@ -82,7 +82,9 @@ class omicsDataset(Dataset):
             self.modality_mask = self._get_mosaic_mask(data)
             #self.data_triangle = torch.Tensor(data_triangle.X.todense())
         elif self.mosaic and label == 'test':
+            print("test set is mosaic")
             self.modality_mask = self._get_mosaic_mask(data)
+            print("mosaic mask is ", self.modality_mask)
 
         # make 1 tensor out of all modalities with shape (n_obs,n_featues)
         #self.data = self._data_to_tensor(data)

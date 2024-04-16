@@ -14,7 +14,7 @@ import matplotlib
 matplotlib.rcParams['agg.path.chunksize'] = 10000
 
 from omicsdgd import DGD
-from omicsdgd.functions._analysis import testset_reconstruction_evaluation_extended, compute_expression_error, binary_output_scores
+from omicsdgd.functions._analysis import testset_reconstruction_evaluation_extended, compute_expression_error, binary_output_scores, calculate_mean_errors, alternative_ATAC_metrics, compute_count_error, spearman_corr
 
 ####################
 # collect test errors per model and sample
@@ -52,60 +52,6 @@ if not os.path.exists(result_path):
 if not os.path.exists(plot_path):
     os.makedirs(plot_path)
 
-def calculate_mean_errors(test_errors, testset, modality_switch):
-    # calculate the average error per sample and modality, along with standard error
-    test_errors_rna = test_errors[:, : modality_switch].detach().cpu().numpy()
-    test_errors_atac = test_errors[:, modality_switch :].detach().cpu().numpy()
-    test_errors_rna_mean_sample = np.mean(test_errors_rna, axis=1)
-    test_errors_atac_mean_sample = np.mean(test_errors_atac, axis=1)
-    test_errors_rna_std_sample = np.std(test_errors_rna, axis=1)
-    test_errors_atac_std_sample = np.std(test_errors_atac, axis=1)
-    test_errors_rna_se_sample = test_errors_rna_std_sample / np.sqrt(test_errors_rna.shape[1])
-    test_errors_atac_se_sample = test_errors_atac_std_sample / np.sqrt(test_errors_atac.shape[1])
-    # now also gene-wise
-    test_errors_rna_mean_gene = np.mean(test_errors_rna, axis=0)
-    test_errors_atac_mean_gene = np.mean(test_errors_atac, axis=0)
-    test_errors_rna_std_gene = np.std(test_errors_rna, axis=0)
-    test_errors_atac_std_gene = np.std(test_errors_atac, axis=0)
-    test_errors_rna_se_gene = test_errors_rna_std_gene / np.sqrt(test_errors_rna.shape[0])
-    test_errors_atac_se_gene = test_errors_atac_std_gene / np.sqrt(test_errors_atac.shape[0])
-    # save the results
-    df1 = pd.DataFrame(
-        {
-            "rna_mean": test_errors_rna_mean_sample,
-            "rna_std": test_errors_rna_std_sample,
-            "rna_se": test_errors_rna_se_sample,
-            "atac_mean": test_errors_atac_mean_sample,
-            "atac_std": test_errors_atac_std_sample,
-            "atac_se": test_errors_atac_se_sample,
-            "batch": testset.obs["Site"].values,
-        }
-    )
-    df2_temp = pd.DataFrame(
-        {
-            "rna_mean": test_errors_rna_mean_gene,
-            "rna_std": test_errors_rna_std_gene,
-            "rna_se": test_errors_rna_se_gene,
-            "feature": testset.var_names[:modality_switch],
-            "modality": "rna"
-        }
-    )
-    df2 = pd.concat(
-        [
-            df2_temp,
-            pd.DataFrame(
-                {
-                    "atac_mean": test_errors_atac_mean_gene,
-                    "atac_std": test_errors_atac_std_gene,
-                    "atac_se": test_errors_atac_se_gene,
-                    "feature": testset.var_names[modality_switch:],
-                    "modality": "atac"
-                }
-            )
-        ]
-    )
-    return df1, df2
-
 
 # loop over models, make predictions and compute errors per test sample
 model_names = [
@@ -126,7 +72,7 @@ random_seeds = [0, 37, 8790]*4
 model_types = ["", "", "", "", "", "", "noCovariate", "noCovariate", "noCovariate", "scDGD", "scDGD", "scDGD"]
 n_components = [22, 22, 22, 1, 1, 1, 22, 22, 22, 22, 22, 22]
 for i, model_name in enumerate(model_names):
-    if i < 6:
+    if i < 5:
         continue
     print("loading model " + model_name)
     if model_types[i] == "scDGD":
@@ -149,6 +95,29 @@ for i, model_name in enumerate(model_names):
         test_predictions = model.predict_from_representation(
             model.test_rep
         )
+    auprc, spearman = alternative_ATAC_metrics(model, testset, modality_switch, library[:,1].unsqueeze(1), axis=None)
+    spearman_rna = spearman_corr(model, testset, modality_switch, library[:,0].unsqueeze(1), axis=None, mod_id=0)
+    # save auprc and spearman
+    pd.DataFrame(
+        {
+            "auprc": [auprc],
+            "spearman": [spearman],
+            "spearman_rna": [spearman_rna],
+        }
+    ).to_csv(
+        result_path
+        + data_name
+        + "_rs"
+        + str(random_seeds[i])
+        + "_"
+        + model_types[i]
+        + "_ncomp"
+        + str(n_components[i])
+        + "_auprc_spearman.csv"
+    )
+    #rmse_atac_sample = compute_count_error(testset, model, library[:,1].unsqueeze(1), modality_switch, error_type='rmse_sample', reduction="sample", mod_id=1)
+    #rmse_atac_feature = compute_count_error(testset, model, library[:,1].unsqueeze(1), modality_switch, error_type='rmse_feature', reduction="feature", mod_id=1)
+
     rmse_sample = compute_expression_error(testset, model, library[:,0].unsqueeze(1), modality_switch, error_type='rmse_sample', reduction="sample")
     if model_types[i] != "scDGD":
         metrics_temp = testset_reconstruction_evaluation_extended(
@@ -166,13 +135,16 @@ for i, model_name in enumerate(model_names):
             + str(n_components[i])
             + "_recon_metrics.csv"
         )
-        tpr_s, tnr_s, ba_s, _, _ = binary_output_scores(testset, model, library[:,1].unsqueeze(1), modality_switch, threshold=0.2, reduction="sample", return_all=True)
+        tpr_s, tnr_s, ba_s, _, _ = binary_output_scores(testset, model, library[:,1].unsqueeze(1), modality_switch, threshold=0.2, batch_size=128, reduction="sample", return_all=True)
+        auprc_s, spearman_s = alternative_ATAC_metrics(model, testset, modality_switch, library[:,1].unsqueeze(1), axis=0)
         df_sample = pd.DataFrame(
             {
                 "rmse": rmse_sample.detach().cpu().numpy(),
                 "tpr": tpr_s.detach().cpu().numpy(),
                 "tnr": tnr_s.detach().cpu().numpy(),
                 "ba": ba_s.detach().cpu().numpy(),
+                "auprc": auprc_s,
+                "spearman": spearman_s,
                 "batch": testset.obs["Site"].values,
             }
         )
@@ -194,6 +166,11 @@ for i, model_name in enumerate(model_names):
         + str(n_components[i])
         + "_RMSE-BA_samplewise.csv"
     )
+    # free memory
+    rmse_sample, df_sample, tpr_s, tnr_s, ba_s, auprc_s, spearman_s = None, None, None, None, None, None, None
+    # free up cuda memory
+    torch.cuda.empty_cache()
+
     rmse_feature = compute_expression_error(testset, model, library[:,0].unsqueeze(1), modality_switch, error_type='rmse_feature', reduction="feature")
     df_feature = pd.DataFrame(
         {
@@ -203,7 +180,8 @@ for i, model_name in enumerate(model_names):
         }
     )
     if model_types[i] != "scDGD":
-        tpr_f, tnr_f, ba_f, _, _ = binary_output_scores(testset, model, library[:,1].unsqueeze(1), modality_switch, threshold=0.2, reduction="feature", return_all=True)
+        tpr_f, tnr_f, ba_f, _, _ = binary_output_scores(testset, model, library[:,1].unsqueeze(1), modality_switch, threshold=0.2, batch_size=128, reduction="feature", return_all=True)
+        auprc_f, spearman_f = alternative_ATAC_metrics(model, testset, modality_switch, library[:,1].unsqueeze(1), axis=1)
         df_feature = pd.concat(
             [
                 df_feature,
@@ -212,6 +190,8 @@ for i, model_name in enumerate(model_names):
                         "tpr": tpr_f.detach().cpu().numpy(),
                         "tnr": tnr_f.detach().cpu().numpy(),
                         "ba": ba_f.detach().cpu().numpy(),
+                        "auprc": auprc_f,
+                        "spearman": spearman_f,
                         "feature_name": testset.var_names[modality_switch:],
                         "feature": "atac"
                     }
@@ -280,7 +260,14 @@ for i, model_name in enumerate(model_names):
         + str(n_components[i])
         + "_prediction_errors_supervised.csv"
     )
+    # free memory
+    test_errors, test_predictions, temp_df = None, None, None
+    rmse_feature, df_feature, tpr_f, tnr_f, ba_f, aucpr_f, spearman_f = None, None, None, None, None, None, None
+
     model = None
     test_predictions = None
     test_errors = None
+
+    # free up cuda memory
+    torch.cuda.empty_cache()
 print("saved dgd predictions")

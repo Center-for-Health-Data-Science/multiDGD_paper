@@ -126,6 +126,7 @@ def learn_new_representations(
     print("calculating losses for each new sample and potential reps")
     # creating a storage tensor into which the best reps are copied
     rep_init_values = torch.zeros((n_samples_new, potential_reps.shape[-1]))
+    #print("   rep_init_values: ", rep_init_values.shape)
     # compute predictions for all potential reps
     predictions = decoder(potential_reps.to(device))
     # go through data loader to calculate losses batch-wise
@@ -138,6 +139,7 @@ def learn_new_representations(
                 [x[:, :, : data_loader.dataset.modality_switch], x[:, :, data_loader.dataset.modality_switch :]],
                 scale=[reshape_scaling_factor(lib[:, xxx], 3) for xxx in range(decoder.n_out_groups)],
                 reduction="sample",
+                mask=data_loader.dataset.get_mask(i)
             )
         else:
             recon_loss_x = decoder.loss(
@@ -145,9 +147,13 @@ def learn_new_representations(
                 [x],
                 scale=[reshape_scaling_factor(lib[:, 0], 3)],
                 reduction="sample",
+                mask=data_loader.dataset.get_mask(i)
             )
         best_fit_ids = torch.argmin(recon_loss_x, dim=-1).detach().cpu()
         rep_init_values[i, :] = potential_reps.clone()[best_fit_ids, :]
+    # print the counts of how often each component has been chosen
+    #print("   ", rep_init_values.mean(0).shape, rep_init_values.mean(-1).shape)
+    #print("   counts of how often each component has been chosen: ", np.unique(rep_init_values.mean(-1).numpy(), return_counts=True))
 
     ############################
     # create new initial representation
@@ -239,10 +245,12 @@ def learn_new_representations(
                     y,
                     [x[:, : data_loader.dataset.modality_switch], x[:, data_loader.dataset.modality_switch :]],
                     scale=[lib[:, xxx].unsqueeze(1) for xxx in range(decoder.n_out_groups)],
+                    mask=data_loader.dataset.get_mask(i)
                 )
             else:
                 recon_loss_x = decoder.loss(
-                    y, [x], scale=[lib[:, xxx].unsqueeze(1) for xxx in range(decoder.n_out_groups)]
+                    y, [x], scale=[lib[:, xxx].unsqueeze(1) for xxx in range(decoder.n_out_groups)],
+                    mask=data_loader.dataset.get_mask(i)
                 )
             # gmm_error = gmm.forward_split(gmm,z).sum()
             gmm_error = gmm(z).sum()

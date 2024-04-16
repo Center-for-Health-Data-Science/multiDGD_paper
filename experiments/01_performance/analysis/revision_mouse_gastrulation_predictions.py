@@ -20,7 +20,7 @@ from sklearn.metrics import silhouette_score, adjusted_rand_score
 from sklearn import preprocessing
 
 from omicsdgd import DGD
-from omicsdgd.functions._analysis import testset_reconstruction_evaluation_extended, compute_expression_error, binary_output_scores
+from omicsdgd.functions._analysis import testset_reconstruction_evaluation_extended, compute_expression_error, binary_output_scores, alternative_ATAC_metrics, compute_count_error, spearman_corr
 
 ####################
 # collect test errors per model and sample
@@ -132,8 +132,8 @@ model_names = [
     "mouse_gast_l20_h2-2_rs37_noCovariate_test50e",
     "mouse_gast_l20_h2-2_rs8790_noCovariate_test50e",
     "mouse_gast_l20_h3_rs0_scDGD_test50e",
-    "mouse_gast_l20_h3_rs37_scDGD_test50e",
-    "mouse_gast_l20_h3_rs8790_scDGD_test50e"
+    #"mouse_gast_l20_h3_rs37_scDGD_test50e",
+    #"mouse_gast_l20_h3_rs8790_scDGD_test50e"
 ]
 random_seeds = [0, 37, 8790]*4
 model_types = ["", "", "", "", "", "", "noCovariate", "noCovariate", "noCovariate", "scDGD", "scDGD", "scDGD"]
@@ -145,7 +145,7 @@ for i, model_name in enumerate(model_names):
     print("trainset shape before: ", trainset.shape)
     if model_types[i] == "scDGD":
         if random_seeds[i] == 0:
-            trainset = trainset[:, :modality_switch]
+            trainset = trainset['rna']
             testset = testset[:, :modality_switch]
     print("trainset shape after: ", trainset.shape)
     print(trainset)
@@ -192,6 +192,31 @@ for i, model_name in enumerate(model_names):
         test_predictions = model.predict_from_representation(
             model.test_rep
         )
+    
+    if model_types[i] != "scDGD":
+        # get overall AUPRC and spearman
+        auprc, spearman = alternative_ATAC_metrics(model, testset, modality_switch, library[:,1].unsqueeze(1), axis=None)
+        spearman_rna = spearman_corr(model, testset, modality_switch, library[:,0].unsqueeze(1), axis=None, mod_id=0)
+        # save auprc and spearman
+        pd.DataFrame(
+            {
+                "auprc": [auprc],
+                "spearman": [spearman],
+                "spearman_rna": [spearman_rna],
+            }
+        ).to_csv(
+            result_path
+            + data_name
+            + "_rs"
+            + str(random_seeds[i])
+            + "_"
+            + model_types[i]
+            + "_ncomp"
+            + str(n_components[i])
+            + "_auprc_spearman.csv"
+        )
+    
+    # get sample-wise errors
     rmse_sample = compute_expression_error(testset, model, library[:,0].unsqueeze(1), modality_switch, error_type='rmse_sample', reduction="sample")
     if model_types[i] != "scDGD":
         metrics_temp = testset_reconstruction_evaluation_extended(
@@ -210,12 +235,15 @@ for i, model_name in enumerate(model_names):
             + "_recon_metrics.csv"
         )
         tpr_s, tnr_s, ba_s, _, _ = binary_output_scores(testset, model, library[:,1].unsqueeze(1), modality_switch, threshold=0.2, reduction="sample", return_all=True)
+        auprc_s, spearman_s = alternative_ATAC_metrics(model, testset, modality_switch, library[:,1].unsqueeze(1), axis=0)
         df_sample = pd.DataFrame(
             {
                 "rmse": rmse_sample.detach().cpu().numpy(),
                 "tpr": tpr_s.detach().cpu().numpy(),
                 "tnr": tnr_s.detach().cpu().numpy(),
                 "ba": ba_s.detach().cpu().numpy(),
+                "auprc": auprc_s,
+                "spearman": spearman_s,
                 "batch": testset.obs["stage"].values,
             }
         )
@@ -237,6 +265,12 @@ for i, model_name in enumerate(model_names):
         + str(n_components[i])
         + "_RMSE-BA_samplewise.csv"
     )
+    # free memory
+    rmse_sample, df_sample, tpr_s, tnr_s, ba_s, auprc_s, spearman_s = None, None, None, None, None, None, None
+    # free up cuda memory
+    torch.cuda.empty_cache()
+
+    # get feature-wise errors
     rmse_feature = compute_expression_error(testset, model, library[:,0].unsqueeze(1), modality_switch, error_type='rmse_feature', reduction="feature")
     df_feature = pd.DataFrame(
         {
@@ -247,6 +281,7 @@ for i, model_name in enumerate(model_names):
     )
     if model_types[i] != "scDGD":
         tpr_f, tnr_f, ba_f, _, _ = binary_output_scores(testset, model, library[:,1].unsqueeze(1), modality_switch, threshold=0.2, reduction="feature", return_all=True)
+        auprc_f, spearman_f = alternative_ATAC_metrics(model, testset, modality_switch, library[:,1].unsqueeze(1), axis=1)
         df_feature = pd.concat(
             [
                 df_feature,
@@ -255,6 +290,8 @@ for i, model_name in enumerate(model_names):
                         "tpr": tpr_f.detach().cpu().numpy(),
                         "tnr": tnr_f.detach().cpu().numpy(),
                         "ba": ba_f.detach().cpu().numpy(),
+                        "auprc": auprc_f,
+                        "spearman": spearman_f,
                         "feature_name": testset.var_names[modality_switch:],
                         "feature": "atac"
                     }
@@ -323,7 +360,15 @@ for i, model_name in enumerate(model_names):
         + str(n_components[i])
         + "_prediction_errors_supervised.csv"
     )
+
+    # free memory
+    test_errors, test_predictions, temp_df = None, None, None
+    rmse_feature, df_feature, tpr_f, tnr_f, ba_f, aucpr_f, spearman_f = None, None, None, None, None, None, None
+
     model = None
     test_predictions = None
     test_errors = None
+
+    # free up cuda memory
+    torch.cuda.empty_cache()
 print("saved dgd predictions")

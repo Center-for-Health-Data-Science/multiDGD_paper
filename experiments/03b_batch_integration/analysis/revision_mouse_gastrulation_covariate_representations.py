@@ -7,8 +7,15 @@ of leaving a batch out of training
 import pandas as pd
 import numpy as np
 import mudata as md
+from sklearn import preprocessing
 
 from omicsdgd import DGD
+from sklearn.metrics import adjusted_rand_score
+from omicsdgd.functions._analysis import gmm_clustering
+
+def cluster_dgd(mod):
+    cluster_labels = gmm_clustering(mod.test_rep, mod.gmm, mod.test_set.meta)
+    return cluster_labels
 
 ####################
 # collect test errors per model and sample
@@ -22,6 +29,10 @@ test_indices = list(np.where(mudata.obs["train_val_test"] == "test")[0])
 trainset = mudata[train_indices, :].copy()
 testset = mudata[test_indices, :].copy()
 batches = trainset.obs["stage"].unique()
+
+le = preprocessing.LabelEncoder()
+le.fit(testset.obs["celltype"].values)
+true_labels = le.transform(testset.obs["celltype"].values)
 
 # make sure the results directory exists
 import os
@@ -40,6 +51,7 @@ model_names = [
     "mouse_gast_l20_h2-2_rs0_leftout_E8.5_test50e_default",
     "mouse_gast_l20_h2-2_rs0_leftout_E8.75_test50e_default"
 ]
+clustering_metric_temp = []
 for i, model_name in enumerate(model_names):
     print("batch left out:",batches_left_out[i])
     if batches_left_out[i] != "none":
@@ -61,6 +73,7 @@ for i, model_name in enumerate(model_names):
     cov_rep = model.correction_test_rep.z.detach().cpu().numpy()
     cov_means = model.correction_gmm.mean.detach().cpu().numpy()
     # save the correction test reps and gmm means
+    """
     np.save(
         result_path
         + data_name
@@ -77,11 +90,25 @@ for i, model_name in enumerate(model_names):
         + "_covariate_means_default.npy",
         cov_means,
     )
+    """
+    model.init_test_set(testset)
+    # compute clustering
+    cluster_labels = cluster_dgd(model)
+    radj = adjusted_rand_score(true_labels, np.asarray(cluster_labels))
+    clustering_metric_temp.append(radj)
     model = None
 print("saved reps")
 
 #exit()
 #"""
+
+clustering_df = pd.DataFrame(
+    {
+        "batch": batches_left_out,
+        "clustering": clustering_metric_temp,
+        "type": "default"
+    }
+)
 
 ####################
 
@@ -93,6 +120,7 @@ model_names = [
     "mouse_gast_l20_h2-2_rs0_leftout_E8.5_test100e_covSupervised_beta10",
     "mouse_gast_l20_h2-2_rs0_leftout_E8.75_test100e_covSupervised_beta20"
 ]
+clustering_metric_temp = []
 for i, model_name in enumerate(model_names):
     print("batch left out:",batches_left_out[i])
     if batches_left_out[i] != "none":
@@ -114,6 +142,7 @@ for i, model_name in enumerate(model_names):
     cov_rep = model.correction_test_rep.z.detach().cpu().numpy()
     cov_means = model.correction_gmm.mean.detach().cpu().numpy()
     # save the correction test reps and gmm means
+    """
     np.save(
         result_path
         + data_name
@@ -130,5 +159,27 @@ for i, model_name in enumerate(model_names):
         + "_covariate_means_supervised.npy",
         cov_means,
     )
+    """
+    model.init_test_set(testset)
+    # compute clustering
+    cluster_labels = cluster_dgd(model)
+    radj = adjusted_rand_score(true_labels, np.asarray(cluster_labels))
+    clustering_metric_temp.append(radj)
     model = None
 print("saved reps")
+
+clustering_df = pd.concat(
+    [
+        clustering_df,
+        pd.DataFrame(
+            {
+                "batch": batches_left_out,
+                "clustering": clustering_metric_temp,
+                "type": "supervised"
+            }
+        ),
+    ]
+)
+clustering_df.to_csv(
+    result_path + data_name + "_testset_clustering_revision.csv"
+)

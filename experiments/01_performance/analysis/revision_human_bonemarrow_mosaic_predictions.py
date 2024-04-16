@@ -14,7 +14,7 @@ import matplotlib
 matplotlib.rcParams['agg.path.chunksize'] = 10000
 
 from omicsdgd import DGD
-from omicsdgd.functions._analysis import testset_reconstruction_evaluation_extended, compute_expression_error, binary_output_scores
+from omicsdgd.functions._analysis import testset_reconstruction_evaluation_extended, compute_expression_error, binary_output_scores, alternative_ATAC_metrics
 from omicsdgd.functions._metrics import clustering_metric
 from sklearn.metrics import silhouette_score
 
@@ -25,7 +25,7 @@ from sklearn.metrics import silhouette_score
 save_dir = "../results/trained_models/"
 data_name = "human_bonemarrow"
 adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
-adata.X = adata.layers["counts"] # I seem to have to do it again
+#adata.X = adata.layers["counts"] # I seem to have to do it again
 modality_switch = 13431
 
 # train-validation-test split for reproducibility
@@ -208,6 +208,9 @@ for i, model_name in enumerate(model_names):
     metrics_temp = testset_reconstruction_evaluation_extended(
         testset, model, modality_switch, library, thresholds=[0.2]
     )
+    auprc, spearman = alternative_ATAC_metrics(model, testset, modality_switch, library[:,1].unsqueeze(1), axis=None)
+    metrics_temp["auprc"] = auprc
+    metrics_temp["spearman"] = spearman
     # save
     metrics_temp.to_csv(
         result_path

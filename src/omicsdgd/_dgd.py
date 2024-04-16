@@ -851,6 +851,7 @@ class DGD(nn.Module):
             self.param_dict["clustering_variable(meta)"],
             self.param_dict["correction_variable"],
             self.param_dict["modalities"],
+            label="test",
         )
         self.test_set.data_to_tensor()
         test_loader = torch.utils.data.DataLoader(

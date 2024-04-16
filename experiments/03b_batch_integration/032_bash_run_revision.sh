@@ -12,7 +12,7 @@
 #SBATCH -p gpu --gres=gpu:titanrtx:1
 
 #Note that a program will be killed once it exceeds this time!
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 
 #Skipping many options! see man sbatch
 # From here on, we can start our program
@@ -60,5 +60,6 @@ echo $CUDA_VISIBLE_DEVICES
 #python ./testing/revision_mouse_gastrulation.py --batch_left_out 4 --random_seed 0
 
 # analysis
-python ./analysis/revision_mouse_gastrulation_predictions.py
+#python ./analysis/revision_mouse_gastrulation_predictions.py
 python ./analysis/revision_mouse_gastrulation_covariate_representations.py
+#python ./analysis/revision_reconstruction_performance_marrow.py

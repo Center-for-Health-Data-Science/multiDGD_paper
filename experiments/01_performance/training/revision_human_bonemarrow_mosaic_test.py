@@ -24,7 +24,7 @@ print("training multiDGD on human bonemarrow data with random seed ", random_see
 ###
 data_name = "human_bonemarrow"
 adata = ad.read_h5ad("../../data/" + data_name + ".h5ad")
-adata.X = adata.layers["counts"] # I seem to have to do it again
+#adata.X = adata.layers["counts"] # I seem to have to do it again
 
 # train-validation-test split for reproducibility
 # best provided as list [[train_indices], [validation_indices]]
@@ -99,6 +99,7 @@ if fraction_unpaired < 1.0:
     #adata_unpaired = scvi.data.organize_multiome_anndatas(adata_multi, adata_rna, adata_atac)
     #adata_unpaired = adata_multi.concatenate(adata_rna).concatenate(adata_atac)
     adata_unpaired = ad.concat([adata_multi, adata_rna, adata_atac], join="outer")
+    adata_unpaired.write("../../data/"+data_name+"_unpaired-"+str(fraction_unpaired)+".h5ad")
     print("organized data")
 else:
     adata_unpaired = adata[mod_1_indices,:].copy()
@@ -107,6 +108,8 @@ else:
     adata_temp.obs['modality'] = 'ATAC'
     #adata_unpaired = adata_unpaired.concatenate(adata_temp)
     adata_unpaired = ad.concat([adata_unpaired, adata_temp], join="outer")
+    adata_unpaired.write("../../data/"+data_name+"_unpaired-"+str(fraction_unpaired)+".h5ad")
+    # save this anndata object for local investigation
     print("organized data")
     adata, adata_temp = None, None
 
@@ -126,33 +129,12 @@ train_val_split = [
 ###
 # initialize model
 ###
-hyperparameters = {
-    "latent_dimension": 20,
-    "n_hidden": 2,
-    "n_hidden_modality": 3,
-    "log_wandb": ["viktoriaschuster", "omicsDGD_revision"]
-}
 
-model = DGD(
-    data=adata,
-    parameter_dictionary=hyperparameters,
-    train_validation_split=train_val_split,
-    modalities="feature_types",
-    meta_label="cell_type",
-    correction="Site",
-    save_dir="../results/trained_models/" + data_name + "/",
-    model_name=data_name + "_l20_h2-3_rs" + str(random_seed)+"_mosaic"+str(fraction_unpaired)+"percent",
-    random_seed=random_seed,
+model = DGD.load(
+    data=adata[train_val_split[0]], 
+    save_dir="../results/trained_models/" + data_name + "/", 
+    model_name=data_name + "_l20_h2-3_rs" + str(random_seed)+"_mosaic"+str(fraction_unpaired)+"percent"
 )
-
-
-###
-# train and save
-###
-print("   training")
-model.train(n_epochs=epochs, train_minimum=train_minimum, developer_mode=True, stop_after=stop_after)
-model.save()
-print("   model saved")
 
 ###
 # predict for test set
