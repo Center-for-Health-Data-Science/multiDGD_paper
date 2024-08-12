@@ -235,6 +235,10 @@ ax_list[-1].text(
     fontweight=grid_letter_fontweight,
 )
 # make these violin plots half for the different models
+# export the number of samples per cell type
+celltype_counts = prediction_metrics_sample.groupby(["celltype"]).size()
+# save
+celltype_counts.to_csv(result_path + "supp_marrow_celltype_counts.csv")
 sns.violinplot(
     x="celltype",
     y="rmse",
@@ -466,6 +470,10 @@ sns.violinplot(
     linewidth=0.1,
     palette=palette_2colrs,
 )
+# export the number of samples per cell type
+gene_bin_counts = prediction_metrics_gene.groupby(["mean_bin"]).size()
+# save
+gene_bin_counts.to_csv(result_path + "supp_marrow_gene_bin_counts.csv")
 # set xticklabels to rna_bin_ranges
 ax_list[-1].set_xticklabels([f"{rna_bin_ranges[i]:.3f}-{rna_bin_ranges[i+1]:.3f}" for i in range(len(rna_bin_ranges)-1)], rotation=90)
 ax_list[-1].set_yscale("log")

@@ -164,7 +164,7 @@ sns.pointplot(
 ax_list[-1].set_xticklabels(ax_list[-1].get_xticklabels(), rotation=45)
 ax_list[-1].set_xlabel("Dataset")
 ax_list[-1].set_ylabel("Root-Mean-Square Error")
-ax_list[-1].set_title("Reconstruction (RNA) \u2193")
+ax_list[-1].set_title("Test reconstruction error (RNA) \u2193")
 ax_list[-1].legend().remove()
 
 ax_list.append(plt.subplot(gs[0:3, 2:4]))
@@ -196,7 +196,7 @@ sns.pointplot(
 ax_list[-1].set_xticklabels(ax_list[-1].get_xticklabels(), rotation=45)
 ax_list[-1].set_xlabel("Dataset")
 ax_list[-1].set_ylabel("Balanced accuracy")
-ax_list[-1].set_title("Reconstruction (ATAC) \u2191")
+ax_list[-1].set_title("Test reconstruction (ATAC) \u2191")
 ax_list[-1].legend(
     bbox_to_anchor=(1.05, 1.0), loc="upper left", frameon=False
 ).set_visible(False)
